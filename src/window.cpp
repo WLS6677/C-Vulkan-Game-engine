@@ -1,0 +1,82 @@
+#include <window.h>
+
+struct WLWindow{
+    GLFWwindow* pWindow;
+    GLFWmonitor* pMonitor;
+    WLU32Vec2 size;
+    bool is_resizable;
+};
+
+WLWindow* wlCreateWindow(const char* name, WLWindowType type){
+    WLResult result; //for debugging
+    glfwInit();
+
+    WLWindow* window;
+    // filling in the WLWindow data
+    window = (WLWindow*)malloc(sizeof(WLWindow));
+    if(!window){
+        result = WL_FAILED_TO_ALLOCATE_WINDOW;
+        WL_LOG(result);
+        return NULL;
+    }
+
+    if(name == NULL){
+        result = WL_NAME_IS_NULL;
+        WL_LOG(result);
+        free(window);
+        return NULL;
+    }
+
+    //temporary defualt size
+    window->size.x = 800;
+    window->size.y = 600;
+
+    window->pMonitor = NULL;
+    if(type!=WL_WINDOWED) {
+        window->pMonitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+        window->size.x = mode->width;
+        window->size.y = mode->height;
+    }
+
+    // actaully creating the window
+    window->pWindow = glfwCreateWindow(window->size.x, window->size.y, name, window->pMonitor, NULL);
+
+    if(!window->pWindow) {
+        result = WL_FAILED_TO_CREATE_WINDOW;
+        WL_LOG(result);
+        free(window);
+        return NULL;
+    }
+    WL_LOG(WL_TEST);
+
+    return window;
+}
+WLResult wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type){
+    return WL_SUCCESS;
+}
+WLResult wlUpdateWindow(WLWindow* window){
+    return WL_SUCCESS;
+}
+WLResult wlPollWindow(WLWindow* window){
+    glfwPollEvents();
+    return WL_SUCCESS;
+}
+WLResult wlCloseWindow(WLWindow* window){
+    WLResult result = WL_SUCCESS; //for debugging
+
+    glfwDestroyWindow(window->pWindow);
+
+    free(window);
+
+    WL_LOG(result);
+    return result;
+}
+bool wlWindowShouldClose(WLWindow* window){
+    return glfwWindowShouldClose(window->pWindow);
+}
+WLU32Vec2 getWindowSize(WLWindow* window){
+    WLU32Vec2 size{0,0};
+    return size;
+}
+//*/
