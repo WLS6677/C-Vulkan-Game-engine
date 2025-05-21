@@ -7,7 +7,7 @@
         "${env:VULKAN_SDK}/Include"
       ],
       "defines": [],
-      "compilerPath": "C:/mingw/bin/g++.exe",
+      "compilerPath": "A:/#-RandomShit/mingw64/bin/g++.exe",
       "cStandard": "c99",
       "cppStandard": "c++17",
       "intelliSenseMode": "gcc-x64",

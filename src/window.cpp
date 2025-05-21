@@ -8,8 +8,6 @@ struct WLWindow{
 };
 
 WLWindow* wlCreateWindow(const char* name, WLWindowType type){
-    glfwInit();
-
     WLWindow* window;
     // filling in the WLWindow data
     window = (WLWindow*)malloc(sizeof(WLWindow));
@@ -41,11 +39,10 @@ WLWindow* wlCreateWindow(const char* name, WLWindowType type){
 
     if(!window->pWindow) {
 
-        WL_LOG(WL_FAILED_TO_CREATE_WINDOW);
+        WL_LOG(WL_FAILED_TO_CREATE_GLFW_WINDOW);
         free(window);
         return NULL;
     }
-    WL_LOG(WL_TEST);
 
     return window;
 }
@@ -59,15 +56,10 @@ WLResult wlPollWindow(WLWindow* window){
     glfwPollEvents();
     return WL_SUCCESS;
 }
-WLResult wlCloseWindow(WLWindow* window){
-    WLResult result = WL_SUCCESS; //for debugging
-
+void wlDestroyWindow(WLWindow* window){
     glfwDestroyWindow(window->pWindow);
 
     free(window);
-
-    WL_LOG(result);
-    return result;
 }
 bool wlWindowShouldClose(WLWindow* window){
     return glfwWindowShouldClose(window->pWindow);

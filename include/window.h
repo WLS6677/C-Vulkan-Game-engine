@@ -22,14 +22,14 @@ WLWindow* wlCreateWindow(const char* name, WLWindowType type);
 // this is for when you change the settings of the window (type).
 WLResult wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type);
 
-// call this every frame.
+// polls events for the window and updates it.
 WLResult wlUpdateWindow(WLWindow* window);
 
 // call this even more than once per frame
 WLResult wlPollWindow(WLWindow* window);
 
 // optional if you want to close the window but keep the app running.
-WLResult wlCloseWindow(WLWindow* window);
+void wlDestroyWindow(WLWindow* window);
 
 // this will determine the while() loop of the app.
 bool wlWindowShouldClose(WLWindow* window);

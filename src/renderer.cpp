@@ -68,3 +68,32 @@ and will need to be rewritten for a raytraced/ raymarched renderer.
     Shader modules (unless shared with compute)
     
 */
+
+WLRenderer* wlCreateRenderer(){
+    WLRenderer* renderer = (WLRenderer*)malloc(sizeof(WLRenderer));
+    //renderer->vulkan_instance
+
+    //creating the VK instance//
+    VkApplicationInfo app_info;
+    app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    app_info.pApplicationName = "hello triangle (:";
+    app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    app_info.pEngineName = "No Engine";
+    app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    app_info.apiVersion = VK_API_VERSION_1_0;
+    VkInstanceCreateInfo vulkan_instance_info;
+    vulkan_instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    vulkan_instance_info.pApplicationInfo;
+    vulkan_instance_info.enabledExtensionCount;
+    vulkan_instance_info.ppEnabledExtensionNames;
+    vulkan_instance_info.flags;
+    vulkan_instance_info.enabledLayerCount;
+    vulkan_instance_info.ppEnabledLayerNames;
+    //vkCreateInstance();
+
+    return NULL;
+}
+
+void wlDestroyRenderer(WLRenderer* renderer){
+    free(renderer);
+}
