@@ -50,6 +50,7 @@ WLResult wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type)
     return WL_SUCCESS;
 }
 WLResult wlUpdateWindow(WLWindow* window){
+    glfwPollEvents();
     return WL_SUCCESS;
 }
 WLResult wlPollWindow(WLWindow* window){
@@ -68,4 +69,3 @@ WLU32Vec2 getWindowSize(WLWindow* window){
     WLU32Vec2 size{0,0};
     return size;
 }
-//*/

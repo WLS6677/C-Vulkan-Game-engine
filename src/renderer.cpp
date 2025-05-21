@@ -78,17 +78,23 @@ WLRenderer* wlCreateRenderer(){
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "hello triangle (:";
     app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    app_info.pEngineName = "No Engine";
+    app_info.pEngineName = "WL Engine";
     app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.apiVersion = VK_API_VERSION_1_0;
+
+    const char* validation_layers[] = {
+        "VK_LAYER_KHRONOS_validation",
+        "VK_KHR_win32_surface"
+    };
+
     VkInstanceCreateInfo vulkan_instance_info;
     vulkan_instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     vulkan_instance_info.pApplicationInfo;
     vulkan_instance_info.enabledExtensionCount;
     vulkan_instance_info.ppEnabledExtensionNames;
     vulkan_instance_info.flags;
-    vulkan_instance_info.enabledLayerCount;
-    vulkan_instance_info.ppEnabledLayerNames;
+    vulkan_instance_info.enabledLayerCount = SIZE_OF_ARRAY(validation_layers);
+    vulkan_instance_info.ppEnabledLayerNames = validation_layers;
     //vkCreateInstance();
 
     return NULL;

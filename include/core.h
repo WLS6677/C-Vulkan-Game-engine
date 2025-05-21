@@ -17,6 +17,8 @@ extern "C" {
     #define WL_LOG(msg) ((void)0)
 #endif
 
+#define SIZE_OF_ARRAY(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 // debug flags
 typedef enum {
     WL_SUCCESS,

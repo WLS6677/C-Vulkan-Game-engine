@@ -1,11 +1,5 @@
 #include <core.h>
 
-struct WLEngine {
-    WLRenderer* pRenderer;
-    WLWindow* pWindow;
-    const char* engine_name;
-};
-
 void wlLog(WLResult result){
     switch(result){
 
@@ -25,6 +19,13 @@ void wlLog(WLResult result){
 
 }
 
+
+
+struct WLEngine {
+    WLRenderer* pRenderer;
+    WLWindow* pWindow;
+    const char* engine_name;
+};
 WLEngine* wlCreateEngine(){
     WLEngine* engine;
     
@@ -40,7 +41,7 @@ WLEngine* wlCreateEngine(){
     //engine->pRenderer = wlCreateRenderer();
 
     engine->pWindow = wlCreateWindow("yo", WL_WINDOWED);
-    if(engine->pRenderer==NULL){
+    if(engine->pWindow==NULL){
         WL_LOG(WL_FAILED_TO_CREATE_WINDOW);
         free(engine);
         return NULL;
@@ -49,18 +50,15 @@ WLEngine* wlCreateEngine(){
     return engine;
 
 }
-
 void wlDestroyEngine(WLEngine* engine){
     wlDestroyRenderer(engine->pRenderer);
     wlDestroyWindow(engine->pWindow);
     free(engine);
 }
-
 void wlRunEngine(WLEngine* engine){
     while(!wlWindowShouldClose(engine->pWindow)){
         wlUpdateWindow(engine->pWindow);
     }
-    
 }
 
 

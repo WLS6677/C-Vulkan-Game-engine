@@ -8,7 +8,7 @@ int main() {
     #endif
 
     WLEngine* Dave = wlCreateEngine();
-    //wlRunEngine(Dave);
+    wlRunEngine(Dave);
     wlDestroyEngine(Dave);
 
     return 0;
