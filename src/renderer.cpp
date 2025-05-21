@@ -1,8 +1,6 @@
 #include <renderer.h>
 
-typedef struct {
-
-    //wlRendererInfo info;
+struct WLRenderer {
 
     GLFWwindow* pWindow;
     VkInstance vulkan_instance;
@@ -12,10 +10,10 @@ typedef struct {
     // SwapChain
     VkSurfaceKHR surface;
     VkSwapchainKHR swapchain;
-    //std::vector<VkImage> swapchain_images;
+    VkImage* pSwapchain_images;
     VkFormat swapChain_image_Format;
     VkExtent2D swapChain_extent;
-    //std::vector<VkImageView> swapChain_image_views;
+    VkImageView* pSwapChain_image_views;
     // queueueueueueueueueueueueueueues
     VkQueue graphics_queue;
     VkQueue present_queue;
@@ -28,7 +26,7 @@ typedef struct {
     VkPipeline graphics_pipeline;
     VkVertexInputAttributeDescription* attribute_descs;
     // buffers yaaay
-    //std::vector<VkFramebuffer> swapChain_framebuffers;
+    VkFramebuffer* swapChain_framebuffers;
     VkBuffer staging_buffer;
     VkDeviceMemory staging_buffer_memory;
     VkBuffer vertex_buffer;
@@ -36,19 +34,37 @@ typedef struct {
     VkBuffer index_buffer;
     VkDeviceMemory index_buffer_memory;
 
-    //std::vector<VkBuffer> uniformBuffers;
-    //std::vector<VkDeviceMemory> uniformBuffersMemory;
-    //std::vector<void*> uniformBuffersMapped;
+    VkBuffer* pUniformBuffers;
+    VkDeviceMemory* pUniformBuffersMemory;
+    void** ppUniformBuffersMapped;
 
     // Command Stuff
     VkCommandPool graphicsCommandPool;
     VkCommandPool transferCommandPool;
-    //std::vector<VkCommandBuffer> commandBuffers;
-    //std::vector<VkSemaphore> imageAvailableSemaphores;
-    //std::vector<VkSemaphore> renderFinishedSemaphores;
-    //std::vector<VkFence> inFlightFences;
+    VkCommandBuffer* pCommandBuffers;
+    VkSemaphore* pImageAvailableSemaphores;
+    VkSemaphore* pRenderFinishedSemaphores;
+    VkFence* pInFlightFences;
     uint32_t currentFrame = 0;
 
-} WlRenderer;
+};
 
+/*
+this stuff will be used for rasterized projects: rendering 3d models, 2 games, etc
+and will need to be rewritten for a raytraced/ raymarched renderer.
 
+    Render pass
+
+    Framebuffers
+
+    Graphics pipelines
+
+    Descriptor layouts/sets
+
+    Vertex/index buffers
+
+    Uniform buffer logicss
+
+    Shader modules (unless shared with compute)
+    
+*/

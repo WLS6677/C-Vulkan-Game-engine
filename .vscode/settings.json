@@ -1,0 +1,36 @@
+{
+    "files.associations": {
+        "array": "cpp",
+        "charconv": "cpp",
+        "compare": "cpp",
+        "functional": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "variant": "cpp",
+        "typeinfo": "cpp"
+    },
+
+    "editor.quickSuggestions": {
+        "other": true,
+        "comments": false,
+        "strings": false
+    },
+    "editor.suggestOnTriggerCharacters": true,
+    "editor.wordBasedSuggestions": "off",
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+
+    // 👇 Always show the autocomplete list (no ghost-only suggestions)
+    "editor.inlineSuggest.enabled": true,
+
+    // 👇 Improve tab/enter suggestion behavior
+    "editor.acceptSuggestionOnEnter": "on",
+
+    // 👇 If using TabNine, avoid it hijacking all suggestions
+    "tabnine.inlineHints": false,
+    "tabnine.experimentalAutoImports": false,
+
+    // 👇 Set a default C++ standard (optional, but helps parsing)
+    "C_Cpp.default.cppStandard": "c++17"
+
+}
