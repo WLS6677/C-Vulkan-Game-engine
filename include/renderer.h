@@ -9,6 +9,7 @@
 #endif
 
 typedef struct WLRenderer WLRenderer;
+typedef struct WLRenderer WKRenderer;
 
 WLRenderer* wlCreateRenderer(WLRenderer* renderer);
 WLResult wlRender(WLRenderer* renderer);

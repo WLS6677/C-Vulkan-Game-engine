@@ -8,21 +8,18 @@ struct WLWindow{
 };
 
 WLWindow* wlCreateWindow(const char* name, WLWindowType type){
-    WLResult result; //for debugging
     glfwInit();
 
     WLWindow* window;
     // filling in the WLWindow data
     window = (WLWindow*)malloc(sizeof(WLWindow));
     if(!window){
-        result = WL_FAILED_TO_ALLOCATE_WINDOW;
-        WL_LOG(result);
+        WL_LOG(WL_FAILED_TO_ALLOCATE_WINDOW);
         return NULL;
     }
 
     if(name == NULL){
-        result = WL_NAME_IS_NULL;
-        WL_LOG(result);
+        WL_LOG(WL_NAME_IS_NULL);
         free(window);
         return NULL;
     }
@@ -43,8 +40,8 @@ WLWindow* wlCreateWindow(const char* name, WLWindowType type){
     window->pWindow = glfwCreateWindow(window->size.x, window->size.y, name, window->pMonitor, NULL);
 
     if(!window->pWindow) {
-        result = WL_FAILED_TO_CREATE_WINDOW;
-        WL_LOG(result);
+
+        WL_LOG(WL_FAILED_TO_CREATE_WINDOW);
         free(window);
         return NULL;
     }
