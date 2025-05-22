@@ -1,8 +1,8 @@
 #include <renderer.h>
+#include <vulkan/vulkan.h>
 
 struct WLRenderer {
 
-    GLFWwindow* pWindow;
     VkInstance vulkan_instance;
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     VkDevice device;
@@ -69,8 +69,32 @@ and will need to be rewritten for a raytraced/ raymarched renderer.
     
 */
 
+//the functions needed for creating the renderer
+const char** get_required_vulkan_extensions(){
+
+    //get the number of extensions
+    uint32_t glfwExtensionCount = 0;  
+    const char** glfw_extensions = wlGetRequiredWindowInstanceExtensioins(&glfwExtensionCount);
+
+    #ifdef WL_DEBUG
+    const char** extensions = (const char**)wlAlloc(glfwExtensionCount+1);
+    extensions = 
+    return extensions;
+    #endif
+
+    
+
+    const char** extensions;
+    extensions = (const char**)wlAlloc(glfwExtensionCount);
+    for(uint16_t i=0; i<glfwExtensionCount; i++){
+        
+    }
+
+    return extensions;
+}
+
 WLRenderer* wlCreateRenderer(){
-    WLRenderer* renderer = (WLRenderer*)malloc(sizeof(WLRenderer));
+    WLRenderer* renderer = (WLRenderer*)wlAlloc(sizeof(WLRenderer));
     //renderer->vulkan_instance
 
     //creating the VK instance//
@@ -82,24 +106,31 @@ WLRenderer* wlCreateRenderer(){
     app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.apiVersion = VK_API_VERSION_1_0;
 
+    #ifdef WL_DEBUG
     const char* validation_layers[] = {
         "VK_LAYER_KHRONOS_validation",
         "VK_KHR_win32_surface"
     };
+    SIZE_OF_ARRAY(validation_layers);
+    #else
+    const char** validation_layers = NULL;
+    #endif
+
+    const char** extensions = get_required_vulkan_extensions();
 
     VkInstanceCreateInfo vulkan_instance_info;
     vulkan_instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    vulkan_instance_info.pApplicationInfo;
-    vulkan_instance_info.enabledExtensionCount;
-    vulkan_instance_info.ppEnabledExtensionNames;
+    vulkan_instance_info.pApplicationInfo = &app_info;
+    vulkan_instance_info.enabledExtensionCount = SIZE_OF_ARRAY(extensions);
+    vulkan_instance_info.ppEnabledExtensionNames = extensions;
     vulkan_instance_info.flags;
-    vulkan_instance_info.enabledLayerCount = SIZE_OF_ARRAY(validation_layers);
-    vulkan_instance_info.ppEnabledLayerNames = validation_layers;
+    vulkan_instance_info.enabledLayerCount = 0;
+    vulkan_instance_info.ppEnabledLayerNames = NULL;
     //vkCreateInstance();
 
     return NULL;
 }
 
 void wlDestroyRenderer(WLRenderer* renderer){
-    free(renderer);
+    //free(renderer);
 }

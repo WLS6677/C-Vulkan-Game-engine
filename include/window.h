@@ -2,9 +2,6 @@
 #define WL_WINDOW
 
 #include <core.h>
-#include <glfw3.h>
-#include <glfw3native.h>
-#include <glm/vec2.hpp>
 
 // this will hold the data of the window, you just need to store it.
 typedef struct WLWindow WLWindow;
@@ -25,9 +22,6 @@ WLResult wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type)
 // polls events for the window and updates it.
 WLResult wlUpdateWindow(WLWindow* window);
 
-// call this even more than once per frame
-WLResult wlPollWindow(WLWindow* window);
-
 // optional if you want to close the window but keep the app running.
 void wlDestroyWindow(WLWindow* window);
 
@@ -38,6 +32,9 @@ bool wlWindowShouldClose(WLWindow* window);
 WLU32Vec2 wlGetWindowSize(WLWindow* window);
 
 // this is for the renderer to resize the frame buffer when the window is resized
-WLResult wlSetWindowResizeCallback(WLWindow* window, void (*callback)(GLFWwindow*, int /*width*/, int /*height*/));
+//WLResult wlSetWindowResizeCallback(WLWindow* window, void (*callback)(GLFWwindow*, int /*width*/, int /*height*/));
+
+// wrapper for glfwGetRequiredInstanceExtensions
+const char** wlGetRequiredWindowInstanceExtensioins(uint32_t* size);
 
 #endif
