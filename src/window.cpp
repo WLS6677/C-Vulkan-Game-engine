@@ -72,6 +72,6 @@ WLU32Vec2 getWindowSize(WLWindow* window){
     WLU32Vec2 size{0,0};
     return size;
 }
-const char** wlGetRequiredWindowInstanceExtensioins(uint32_t* pSize){
+const char** wlGetRequiredWindowInstanceExtensions(uint32_t* pSize){
     return glfwGetRequiredInstanceExtensions(pSize);
 }

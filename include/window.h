@@ -35,6 +35,6 @@ WLU32Vec2 wlGetWindowSize(WLWindow* window);
 //WLResult wlSetWindowResizeCallback(WLWindow* window, void (*callback)(GLFWwindow*, int /*width*/, int /*height*/));
 
 // wrapper for glfwGetRequiredInstanceExtensions
-const char** wlGetRequiredWindowInstanceExtensioins(uint32_t* size);
+const char** wlGetRequiredWindowInstanceExtensions(uint32_t* size);
 
 #endif

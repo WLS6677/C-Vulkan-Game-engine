@@ -69,28 +69,34 @@ and will need to be rewritten for a raytraced/ raymarched renderer.
     
 */
 
-//the functions needed for creating the renderer
-const char** get_required_vulkan_extensions(){
+//the functions needed for creating the VkInstance
+const char** get_required_vulkan_extensions(uint32_t* pCount){
 
     //get the number of extensions
     uint32_t glfwExtensionCount = 0;  
-    const char** glfw_extensions = wlGetRequiredWindowInstanceExtensioins(&glfwExtensionCount);
+    const char** glfw_extensions = wlGetRequiredWindowInstanceExtensions(&glfwExtensionCount);
 
+    // this one will be allocted so it can be outside the scope of the function
+    const char** extensions;
+
+    //adding 
     #ifdef WL_DEBUG
-    const char** extensions = (const char**)wlAlloc(glfwExtensionCount+1);
-    extensions = 
-    return extensions;
+    //allocating the extensions with the extra debug extension
+    extensions = (const char**)wlAlloc((glfwExtensionCount+1)*sizeof(const char*));
+    extensions[glfwExtensionCount] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+    *pCount = glfwExtensionCount + 1;
+    #else //WL_DEBUG
+    extensions = (const char**)wlAlloc(glfwExtensionCount*sizeof(const char*));
+    *pCount = glfwExtensionCount;
     #endif
+
+    for(uint16_t i=0; i<glfwExtensionCount; i++){
+        extensions[i] = glfw_extensions[i];
+    }
 
     
 
-    const char** extensions;
-    extensions = (const char**)wlAlloc(glfwExtensionCount);
-    for(uint16_t i=0; i<glfwExtensionCount; i++){
-        
-    }
-
-    return extensions;
+    return extensions; 
 }
 
 WLRenderer* wlCreateRenderer(){
@@ -116,12 +122,13 @@ WLRenderer* wlCreateRenderer(){
     const char** validation_layers = NULL;
     #endif
 
-    const char** extensions = get_required_vulkan_extensions();
+    uint32_t extension_count = 0;
+    const char** extensions = get_required_vulkan_extensions(&extension_count);
 
     VkInstanceCreateInfo vulkan_instance_info;
     vulkan_instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     vulkan_instance_info.pApplicationInfo = &app_info;
-    vulkan_instance_info.enabledExtensionCount = SIZE_OF_ARRAY(extensions);
+    vulkan_instance_info.enabledExtensionCount = extension_count;
     vulkan_instance_info.ppEnabledExtensionNames = extensions;
     vulkan_instance_info.flags;
     vulkan_instance_info.enabledLayerCount = 0;
