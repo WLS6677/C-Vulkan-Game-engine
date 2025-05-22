@@ -37,6 +37,7 @@ uint8_t* wlAlloc(uint32_t request_size){
 
     // changes the allocated ammount to the actual allocated ammount which is +1 from the 
     allocator.allocated_amount += request_size;
+    wlPrintAllocatorInfo();
     return return_pointer;
 }
 void wlPrintAllocatorInfo(){
