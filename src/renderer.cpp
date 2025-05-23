@@ -152,7 +152,7 @@ WLSwapChainSupportDetails query_swap_chain_support_details(VkPhysicalDevice devi
 
     uint32_t present_count = 0;
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_count, NULL);
-    details.present_modes = (VkPresentModeKHR*)wlAlloc(format_count*sizeof(VkPresentModeKHR));
+    details.present_modes = (VkPresentModeKHR*)wlAlloc(present_count*sizeof(VkPresentModeKHR));
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_count, details.present_modes);
     
 

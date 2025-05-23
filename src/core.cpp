@@ -128,6 +128,7 @@ void wlRunEngine(WLEngine* engine){
     while(!wlWindowShouldClose(engine->pWindow)){
         wlUpdateWindow(engine->pWindow);
     }
+    printf("shutting down...");
 }
 
 

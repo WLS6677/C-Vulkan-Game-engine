@@ -31,6 +31,7 @@
     "tabnine.experimentalAutoImports": false,
 
     // 👇 Set a default C++ standard (optional, but helps parsing)
-    "C_Cpp.default.cppStandard": "c++17"
+    "C_Cpp.default.cppStandard": "c++17",
+    "makefile.configureOnOpen": false
 
 }
