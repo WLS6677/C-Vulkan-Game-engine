@@ -1,7 +1,8 @@
 #include <renderer.h>
 #include <vulkan/vulkan.h>
+#include <glfw3.h>
 
-struct WLRenderer {
+struct WLRenderer{
 
     VkInstance vulkan_instance;
     VkPhysicalDevice physical_device;
@@ -48,13 +49,19 @@ struct WLRenderer {
     uint32_t currentFrame = 0;
 
 };
-typedef struct WLQueueFamilyIndices {
+typedef struct WLQueueFamilyIndices{
     uint32_t graphics_family;
     uint32_t present_family;
     uint32_t compute_family;
     uint32_t transfer_family;
     bool are_complete;
 } WLQueueFamilyIndices;
+typedef struct WLSwapChainSupportDetails{
+    VkSurfaceCapabilitiesKHR capabilities;
+    VkSurfaceFormatKHR* formats;
+    VkPresentModeKHR* present_modes;
+} WLSwapChainSupportDetails;
+
 
 /*
 this stuff will be used for rasterized projects: rendering 3d models, 2 games, etc
@@ -105,7 +112,7 @@ const char** get_required_vulkan_extensions(uint32_t* pCount){
 
     return extensions; 
 }
-WLQueueFamilyIndices find_queue_families(VkPhysicalDevice device){
+WLQueueFamilyIndices find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface){
     WLQueueFamilyIndices family_indices;
     family_indices.graphics_family = UINT32_MAX;
     family_indices.present_family = UINT32_MAX;
@@ -126,14 +133,18 @@ WLQueueFamilyIndices find_queue_families(VkPhysicalDevice device){
     for(size_t i=0; i<queue_family_count; i++){
         if( family_indices.graphics_family==UINT32_MAX && family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
             family_indices.graphics_family = i;
-            family_indices.present_family = i; break;
         }
         if( family_indices.transfer_family==UINT32_MAX && family_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT){
-            family_indices.transfer_family = i; break;
+            family_indices.transfer_family = i;
         }
         if( family_indices.compute_family==UINT32_MAX && family_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT){
-            family_indices.compute_family = i; break;
+            family_indices.compute_family = i;
         }
+        VkBool32 presentSupport = VK_FALSE;
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+        if(presentSupport){ 
+        family_indices.present_family = i;
+        }           
     }
 
     if( family_indices.graphics_family!=UINT32_MAX &&
@@ -145,13 +156,54 @@ WLQueueFamilyIndices find_queue_families(VkPhysicalDevice device){
 
     return family_indices;
 }
-bool is_device_suitable(VkPhysicalDevice device){
-    VkPhysicalDeviceProperties device_properties;
-    vkGetPhysicalDeviceProperties(device, &device_properties);
-    VkPhysicalDeviceFeatures device_features;
-    vkGetPhysicalDeviceFeatures(device, &device_features);
+bool check_device_extensions_support(VkPhysicalDevice device){
+    return true;
+}
+WLSwapChainSupportDetails query_swap_chain_support_details(VkPhysicalDevice device, VkSurfaceKHR surface){
+    WLSwapChainSupportDetails details = {};
+    
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
 
-    WLQueueFamilyIndices queue_indices = find_queue_families(device);
+    uint32_t format_count = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, NULL);
+    details.formats = (VkSurfaceFormatKHR*)wlAlloc(format_count*sizeof(VkSurfaceFormatKHR));
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, details.formats);
+
+
+
+
+    return details;
+}
+bool is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface){
+
+    //checking for device properties
+    VkPhysicalDeviceProperties device_properties = {};
+    vkGetPhysicalDeviceProperties(device, &device_properties);
+    if(device_properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU){
+        WL_LOG(WL_LOG_WARNING, "GPU isnt discrete");
+        return false;
+    }
+
+    //checking for family queues availablity
+    WLQueueFamilyIndices queue_indices = find_queue_families(device, surface);
+    if(!queue_indices.are_complete){
+        WL_LOG(WL_LOG_WARNING, "GPU doesnt support required family queues");
+        return false;
+    }
+
+    //checking for device extension support
+    if(!check_device_extensions_support(device)){
+        WL_LOG(WL_LOG_WARNING,"GPU doesnt support required extensions");
+        return false;
+    }
+
+    //checking for swapchain support
+    WLSwapChainSupportDetails swapchain_details = query_swap_chain_support_details(device, surface);
+    if(swapchain_details.formats==NULL || swapchain_details.present_modes==NULL){
+        WL_LOG(WL_LOG_WARNING, "GPU doesnt support swapcahin present formats or mods");
+        return false;
+    }
+
     return true;
 }
 
@@ -164,8 +216,6 @@ typedef VkResult (VKAPI_PTR *PFN_vkCreateDebugUtilsMessengerEXT)(
     const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
     const VkAllocationCallbacks* pAllocator,
     VkDebugUtilsMessengerEXT* pMessenger);
-
-
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -187,13 +237,15 @@ VkResult LoadDebugUtilsMessengerEXTFunctions(VkInstance instance) {
         vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
 
     if (fpCreateDebugUtilsMessengerEXT == NULL) {
-        WL_LOG(WL_WARNING, "vulkan debug messenger extension not present");
+        WL_LOG(WL_LOG_WARNING, "vulkan debug messenger extension not present");
         return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
     return VK_SUCCESS;
 }
 
-WLRenderer* wlCreateRenderer(){
+
+
+WLRenderer* wlCreateRenderer(void* window_handle){
     WLRenderer* renderer = (WLRenderer*)wlAlloc(sizeof(WLRenderer));
 
     #ifdef WL_DEBUG
@@ -211,7 +263,7 @@ WLRenderer* wlCreateRenderer(){
 ////////////////////////////////////////////////////////
     //      creating the VK instance        //
 
-    WL_LOG(WL_TRACE,"creating vulkan instance...");
+    WL_LOG(WL_LOG_TRACE,"creating vulkan instance...");
 
     VkApplicationInfo app_info = {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -246,14 +298,14 @@ WLRenderer* wlCreateRenderer(){
     VkResult create_result;
     create_result = vkCreateInstance(&vulkan_instance_info, NULL, &renderer->vulkan_instance);
     if(create_result!= VK_SUCCESS){
-        WL_LOG(WL_FATAL, "failed to create VkInstance");
+        WL_LOG(WL_LOG_FATAL, "failed to create VkInstance");
         return NULL;
     }
 
 /////////////////////////////////////////////////////
     //      debug messenger     //
 
-    WL_LOG(WL_TRACE,"creating debug messenger...");
+    WL_LOG(WL_LOG_TRACE,"creating debug messenger...");
 
     #ifdef WL_DEBUG
     LoadDebugUtilsMessengerEXTFunctions(renderer->vulkan_instance);
@@ -262,19 +314,37 @@ WLRenderer* wlCreateRenderer(){
     debugger_result = fpCreateDebugUtilsMessengerEXT(renderer->vulkan_instance,&debugger_info, NULL, &renderer->debug_messenger);
 
     if(debugger_result != VK_SUCCESS){
-        WL_LOG(WL_WARNING, "failed to create debug messenger");
+        WL_LOG(WL_LOG_WARNING, "failed to create debug messenger");
     }
     #endif //WL_DEBUG
+
+/////////////////////////////////////////////
+    //      creating surface        //
+
+    WL_LOG(WL_LOG_TRACE, "creating surfaceKHR...");
+    VkResult surface_result;
+    if(window_handle==NULL){
+        WL_LOG(WL_LOG_FATAL, "window handle is NULL");
+        return NULL;
+    }
+    surface_result = glfwCreateWindowSurface(renderer->vulkan_instance, (GLFWwindow*)window_handle, NULL, &renderer->surface);
+    if(surface_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create surfaceKHR");
+        return NULL;
+    }
+    WL_LOG(WL_LOG_TRACE, "surfaceKHR created successfully!");
+
+
 
 /////////////////////////////////////////////////////  
     //      creating the physicsal device   //
 
-    WL_LOG(WL_TRACE,"gettings valid GPUs...");
+    WL_LOG(WL_LOG_TRACE,"gettings valid GPUs...");
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(renderer->vulkan_instance, &device_count, NULL);
 
     if(device_count==0){
-        WL_LOG(WL_FATAL, "no GPUs with vulkan support");
+        WL_LOG(WL_LOG_FATAL, "no GPUs with vulkan support");
         return NULL;
     }
 
@@ -282,35 +352,34 @@ WLRenderer* wlCreateRenderer(){
     VkPhysicalDevice physical_devices[device_count];
     vkEnumeratePhysicalDevices(renderer->vulkan_instance, &device_count, physical_devices);
 
-    WL_LOG(WL_TRACE,"choosing GPU...");
-    renderer->physical_device = NULL;
+    WL_LOG(WL_LOG_TRACE,"choosing GPU...");
+    renderer->physical_device = VK_NULL_HANDLE;
     for(uint32_t i=0; i<device_count; i++){
-        if(is_device_suitable(physical_devices[i])){
+        if(is_device_suitable(physical_devices[i], renderer->surface)){
             renderer->physical_device = physical_devices[i];
             break;
         }
     }
-    if(renderer->physical_device==NULL){
-        WL_LOG(WL_FATAL, "no suitable gpu for vulkan");
+    if(renderer->physical_device==VK_NULL_HANDLE){
+        WL_LOG(WL_LOG_FATAL, "no suitable gpu for vulkan");
         return NULL;
     }
-    WL_LOG(WL_TRACE,"successfully! found a suitable GPU!s");
+    WL_LOG(WL_LOG_TRACE,"successfully! found a suitable GPU!s");
 
     VkDeviceCreateInfo device_info = {};
     device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-    WL_LOG(WL_TRACE,"creating physical device...");
+    WL_LOG(WL_LOG_TRACE,"creating physical device...");
     VkResult device_result;
-    //device_result = vkCreateDevice(renderer->physical_device, NULL, NULL, NULL);
+    device_result = vkCreateDevice(renderer->physical_device, NULL, NULL, NULL);
     if(device_result != VK_SUCCESS){
-        WL_LOG(WL_FATAL, "failed to create device");
+        WL_LOG(WL_LOG_FATAL, "failed to create device");
         return NULL;
     }
-    WL_LOG(WL_TRACE,"physical device created successfully!");
+    WL_LOG(WL_LOG_TRACE,"physical device created successfully!");
 
     return NULL;
 }
-
 void wlDestroyRenderer(WLRenderer* renderer){
 
     fpDestroyDebugUtilsMessengerEXT(renderer->vulkan_instance, renderer->debug_messenger, NULL);

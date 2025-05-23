@@ -10,7 +10,7 @@
 typedef struct WLRenderer WLRenderer;
 typedef struct WLRenderer WKRenderer;
 
-WLRenderer* wlCreateRenderer();
+WLRenderer* wlCreateRenderer(void* window_hanlde);
 void wlRender(WLRenderer* renderer);
 void wlDestroyRenderer(WLRenderer* renderer);
 

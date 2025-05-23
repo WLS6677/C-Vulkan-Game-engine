@@ -7,7 +7,7 @@ int main() {
     printf("debug mode...\n");
     #endif
 
-    WL_LOG(WL_TRACE, "HELLO");
+    WL_LOG(WL_LOG_TRACE, "HELLO");
 
     WLEngine* Dave = wlCreateEngine();
     wlRunEngine(Dave);

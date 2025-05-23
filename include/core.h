@@ -22,9 +22,10 @@ void wlPrintAllocatorInfo();
 
 // debug flags for wlLog
 typedef enum {
-    WL_FATAL,
-    WL_TRACE,
-    WL_WARNING,
+    WL_LOG_FATAL,
+    WL_LOG_WARNING,
+    WL_LOG_TRACE,
+    WL_LOG_PRINT
 } WLResult;
 
 void wlLog(WLResult result, const char* file, uint32_t line, const char* func, const char* msg);

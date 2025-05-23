@@ -13,16 +13,17 @@ WLWindow* wlCreateWindow(const char* name, WLWindowType type){
     WLWindow* window;
 
     glfwInit();
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     // filling in the WLWindow data
     window = (WLWindow*)wlAlloc(sizeof(WLWindow));
     if(!window){
-        WL_LOG(WL_FATAL, "failed to allocate window");
+        WL_LOG(WL_LOG_FATAL, "failed to allocate window");
         return NULL;
     }
 
     if(name == NULL){
-        WL_LOG(WL_FATAL, "window name is NULL");
+        WL_LOG(WL_LOG_FATAL, "window name is NULL");
         return NULL;
     }
 
@@ -42,7 +43,7 @@ WLWindow* wlCreateWindow(const char* name, WLWindowType type){
     window->pWindow = glfwCreateWindow(window->size.x, window->size.y, name, window->pMonitor, NULL);
 
     if(!window->pWindow) {
-        WL_LOG(WL_FATAL, "failed to create glfw window Handle");
+        WL_LOG(WL_LOG_FATAL, "failed to create glfw window Handle");
         return NULL;
     }
 
@@ -59,7 +60,7 @@ void wlDestroyWindow(WLWindow* window){
 }
 bool wlWindowShouldClose(WLWindow* window){
     if(window==NULL){
-        WL_LOG(WL_WARNING, "window doesnt exist"); 
+        WL_LOG(WL_LOG_WARNING, "window doesnt exist"); 
         return false;
     }
     return glfwWindowShouldClose(window->pWindow);
@@ -71,3 +72,9 @@ WLU32Vec2 getWindowSize(WLWindow* window){
 const char** wlGetRequiredWindowInstanceExtensions(uint32_t* pSize){
     return glfwGetRequiredInstanceExtensions(pSize);
 }
+void* wlGetRawWindowHandle(WLWindow* window){
+    return (void*)window->pWindow;
+}
+
+
+

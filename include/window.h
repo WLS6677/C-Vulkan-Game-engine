@@ -36,5 +36,7 @@ WLU32Vec2 wlGetWindowSize(WLWindow* window);
 
 // wrapper for glfwGetRequiredInstanceExtensions
 const char** wlGetRequiredWindowInstanceExtensions(uint32_t* size);
+// for renderer/Vulkan specific functions
+void* wlGetRawWindowHandle(WLWindow* window);
 
 #endif
