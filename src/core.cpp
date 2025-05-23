@@ -1,4 +1,5 @@
 #include <core.h>
+#include <stdarg.h>
 
 struct WLAllocator {
     uint8_t* rootPointer;
@@ -11,7 +12,7 @@ void wlSetupAllocator(uint32_t size){
     allocator.max_allocation_size = size;
     allocator.rootPointer = (uint8_t*)malloc(size);
     if(allocator.rootPointer==NULL){
-        WL_LOG(WL_FAILED_TO_ALLOCATE);
+        WL_LOG(WL_WARNING, "allocater failed to malloc memory block");
     }
 }
 void wlReleaseAlloc(){
@@ -37,7 +38,8 @@ uint8_t* wlAlloc(uint32_t request_size){
 
     // changes the allocated ammount to the actual allocated ammount which is +1 from the 
     allocator.allocated_amount += request_size;
-    wlPrintAllocatorInfo();
+    //wlPrintAllocatorInfo();
+    //WL_LOG(WL_TRACE, "hello");
     return return_pointer;
 }
 void wlPrintAllocatorInfo(){
@@ -47,21 +49,21 @@ void wlPrintAllocatorInfo(){
 
 
 
-void wlLog(WLResult result){
+void wlLog(WLResult result, const char* file, uint32_t line, const char* func, const char* msg){
     switch(result){
+        case WL_TRACE:
+        printf("%s: %u: %s: %s\n", file, line, func,  msg);
+        break;
 
-        case WL_TEST: printf("this is a test and the LOG fucntion is working!\n");break;
-        case WL_NAME_IS_NULL: printf("a NULL pointer was passed as an arg to a function\n");break;
-        case WL_FAILED_TO_ALLOCATE: printf("malloc failed somewhere\n");
-        case WL_FAILED_TO_ALLOCATE_WINDOW: printf("failed to allocate window\n");break;
-        case WL_FAILED_TO_CREATE_GLFW_WINDOW: printf("failed to create glfw windown\n");break;
-        case WL_FAILED_TO_CREATE_WINDOW: printf("failed to create window\n");break;
-        case WL_FAILED_TO_CREATE_RENDERER: printf("failed to create Renderer\n");break;
-        case WL_SUCCESS:break;
+        default:
+        case WL_WARNING:
+        printf("[warning] %s: %u: %s: %s\n", file, line, func,  msg);
+        break;
         
-        defualt:
-        case WL_FAIL:
-        printf("Unknown Error\n");
+        case WL_FATAL:
+        printf("[FATAL] %s: %u: %s: %s\n", file, line, func,  msg);
+        fflush(stdout); //prints immediately
+        break;
     }
 
 }
@@ -83,7 +85,7 @@ WLEngine* wlCreateEngine(){
     wlSetupAllocator(1024*1024*8);
     engine = (WLEngine*)wlAlloc(sizeof(WLEngine));
     if(engine==NULL){
-        WL_LOG(WL_FAILED_TO_ALLOCATE);
+        WL_LOG(WL_FATAL, "failed to allocate memory for engine");
         wlReleaseAlloc();
         return NULL;
     }
@@ -92,7 +94,7 @@ WLEngine* wlCreateEngine(){
 
     engine->pWindow = wlCreateWindow("yo", WL_WINDOWED);
     if(engine->pWindow==NULL){
-        WL_LOG(WL_FAILED_TO_CREATE_WINDOW);
+        WL_LOG(WL_FATAL, "failed to create window");
         wlReleaseAlloc();
         return NULL;
     }

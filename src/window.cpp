@@ -17,13 +17,12 @@ WLWindow* wlCreateWindow(const char* name, WLWindowType type){
     // filling in the WLWindow data
     window = (WLWindow*)wlAlloc(sizeof(WLWindow));
     if(!window){
-        WL_LOG(WL_FAILED_TO_ALLOCATE_WINDOW);
+        WL_LOG(WL_FATAL, "failed to allocate window");
         return NULL;
     }
 
     if(name == NULL){
-        WL_LOG(WL_NAME_IS_NULL);
-        free(window);
+        WL_LOG(WL_FATAL, "window name is NULL");
         return NULL;
     }
 
@@ -43,19 +42,16 @@ WLWindow* wlCreateWindow(const char* name, WLWindowType type){
     window->pWindow = glfwCreateWindow(window->size.x, window->size.y, name, window->pMonitor, NULL);
 
     if(!window->pWindow) {
-        WL_LOG(WL_FAILED_TO_CREATE_GLFW_WINDOW);
-        free(window);
+        WL_LOG(WL_FATAL, "failed to create glfw window Handle");
         return NULL;
     }
 
     return window;
 }
-WLResult wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type){
-    return WL_SUCCESS;
+void wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type){
 }
-WLResult wlUpdateWindow(WLWindow* window){
+void wlUpdateWindow(WLWindow* window){
     glfwPollEvents();
-    return WL_SUCCESS;
 }
 void wlDestroyWindow(WLWindow* window){
     glfwDestroyWindow(window->pWindow);
@@ -63,7 +59,7 @@ void wlDestroyWindow(WLWindow* window){
 }
 bool wlWindowShouldClose(WLWindow* window){
     if(window==NULL){
-        WL_LOG(WL_INPUT_IS_NULL); 
+        WL_LOG(WL_WARNING, "window doesnt exist"); 
         return false;
     }
     return glfwWindowShouldClose(window->pWindow);

@@ -11,7 +11,7 @@ typedef struct WLRenderer WLRenderer;
 typedef struct WLRenderer WKRenderer;
 
 WLRenderer* wlCreateRenderer();
-WLResult wlRender(WLRenderer* renderer);
+void wlRender(WLRenderer* renderer);
 void wlDestroyRenderer(WLRenderer* renderer);
 
 #endif

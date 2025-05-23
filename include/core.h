@@ -20,28 +20,22 @@ void wlReleaseAlloc();
 uint8_t* wlAlloc(uint32_t size);
 void wlPrintAllocatorInfo();
 
-//this is the debugging logging macro, it will either lead to a debug manager or do nothing on release
-#ifdef WL_DEBUG
-    #define WL_LOG(msg) wlLog(msg)
-#else
-    #define WL_LOG(msg) ((void)0)
-#endif
-
-// debug flags
+// debug flags for wlLog
 typedef enum {
-    WL_SUCCESS,
-    WL_FAIL,
-    WL_TEST,
-    WL_NAME_IS_NULL, // a const char* had NULL as input 
-    WL_FAILED_TO_ALLOCATE_WINDOW, // when calling malloc for WLWindow
-    WL_FAILED_TO_ALLOCATE,
-    WL_FAILED_TO_CREATE_GLFW_WINDOW, // glfwCreateWIndow();
-    WL_FAILED_TO_CREATE_WINDOW, // wlCreateWindow();
-    WL_FAILED_TO_CREATE_RENDERER, 
+    WL_FATAL,
+    WL_TRACE,
+    WL_WARNING,
 } WLResult;
 
-// in debug mode, this will be used to log any errors in all moduless
-void wlLog(WLResult); 
+void wlLog(WLResult result, const char* file, uint32_t line, const char* func, const char* msg);
+
+//this is the debugging logging macro, it will either lead to a debug manager or do nothing on release
+#ifdef WL_DEBUG
+    #define WL_LOG(level, msg) wlLog(level, __FILE__, __LINE__, __func__, msg)
+#else
+    #define WL_LOG(level, msg) ((void)0)
+#endif
+
 
 //////////////////////////////////////
 //                                  //

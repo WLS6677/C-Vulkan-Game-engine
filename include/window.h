@@ -17,10 +17,10 @@ typedef enum  {
 WLWindow* wlCreateWindow(const char* name, WLWindowType type);
 
 // this is for when you change the settings of the window (type).
-WLResult wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type);
+void wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type);
 
 // polls events for the window and updates it.
-WLResult wlUpdateWindow(WLWindow* window);
+void wlUpdateWindow(WLWindow* window);
 
 // optional if you want to close the window but keep the app running.
 void wlDestroyWindow(WLWindow* window);
