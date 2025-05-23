@@ -135,12 +135,64 @@ bool is_device_suitable(VkPhysicalDevice device){
     WLQueueFamilyIndices queue_indices = find_queue_families(device);
 }
 
+
+// debugger functions
+static PFN_vkCreateDebugUtilsMessengerEXT fpCreateDebugUtilsMessengerEXT = NULL;
+static PFN_vkDestroyDebugUtilsMessengerEXT fpDestroyDebugUtilsMessengerEXT = NULL;
+typedef VkResult (VKAPI_PTR *PFN_vkCreateDebugUtilsMessengerEXT)(
+    VkInstance instance,
+    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkDebugUtilsMessengerEXT* pMessenger);
+
+
+VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+{
+    (void)messageSeverity;
+    (void)messageType;
+    (void)pUserData;
+
+    printf("validation layer: %s\n", pCallbackData->pMessage);
+
+    return VK_FALSE;
+}
+VkResult LoadDebugUtilsMessengerEXTFunctions(VkInstance instance) {
+    fpCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)
+        vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    fpDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)
+        vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+
+    if (fpCreateDebugUtilsMessengerEXT == NULL) {
+        WL_LOG(WL_WARNING, "vulkan debug messenger extension not present");
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+    return VK_SUCCESS;
+}
+
 WLRenderer* wlCreateRenderer(){
     WLRenderer* renderer = (WLRenderer*)wlAlloc(sizeof(WLRenderer));
     //renderer->vulkan_instance
 
-    //creating the VK instance//
-    VkApplicationInfo app_info;
+    #ifdef WL_DEBUG
+
+    VkDebugUtilsMessengerCreateInfoEXT debugger_info = {};
+    debugger_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    debugger_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    debugger_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    debugger_info.pfnUserCallback = debug_callback; 
+    debugger_info.pUserData = NULL;
+    debugger_info.flags = 0;
+
+    #endif //WL_DEBUG
+
+////////////////////////////////////////////////////////
+    //      creating the VK instance        //
+
+    VkApplicationInfo app_info = {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "hello triangle (:";
     app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -151,22 +203,24 @@ WLRenderer* wlCreateRenderer(){
     uint32_t extension_count = 0;
     const char** extensions = get_required_vulkan_extensions(&extension_count);
 
-    VkInstanceCreateInfo vulkan_instance_info;
+    VkInstanceCreateInfo vulkan_instance_info = {};
     vulkan_instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     vulkan_instance_info.pApplicationInfo = &app_info;
     vulkan_instance_info.enabledExtensionCount = extension_count;
     vulkan_instance_info.ppEnabledExtensionNames = extensions;
     vulkan_instance_info.flags = 0;
-    vulkan_instance_info.pNext = NULL;
+    
 
     #ifdef WL_DEBUG
     const char* validation_layers[] = { "VK_LAYER_KHRONOS_validation" };
     vulkan_instance_info.enabledLayerCount = SIZE_OF_ARRAY(validation_layers);
     vulkan_instance_info.ppEnabledLayerNames = validation_layers;
-    #else
+    vulkan_instance_info.pNext = &debugger_info;
+    #else //WL_DEBUG
     vulkan_instance_info.enabledLayerCount = 0;
     vulkan_instance_info.ppEnabledLayerNames = NULL;
-    #endif
+    vulkan_instance_info.pNext = NULL;
+    #endif //WL_DEBUG
 
     VkResult create_result;
     create_result = vkCreateInstance(&vulkan_instance_info, NULL, &renderer->vulkan_instance);
@@ -174,7 +228,23 @@ WLRenderer* wlCreateRenderer(){
         WL_LOG(WL_FATAL, "failed to create VkInstance");
         return NULL;
     }
+
+/////////////////////////////////////////////////////
+    //      debug messenger     //
+
+    #ifdef WL_DEBUG
+    LoadDebugUtilsMessengerEXTFunctions(renderer->vulkan_instance);
+
+    VkResult debugger_result;
+    debugger_result = fpCreateDebugUtilsMessengerEXT(renderer->vulkan_instance,&debugger_info, NULL, &renderer->debug_messenger);
+
+    if(debugger_result != VK_SUCCESS){
+        WL_LOG(WL_WARNING, "failed to create debug messenger");
+    }
+    #endif //WL_DEBUG
+
 /////////////////////////////////////////////////////  
+    //      creating the physicsal device   //
 
     // getting the number of valid GPUs
     uint32_t device_count = 0;
@@ -202,11 +272,11 @@ WLRenderer* wlCreateRenderer(){
     }
 
 
-    VkDeviceCreateInfo device_info;
+    VkDeviceCreateInfo device_info = {};
     device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
     VkResult device_result;
-    device_result = vkCreateDevice(renderer->physical_device, );
+    device_result = vkCreateDevice(renderer->physical_device, NULL, NULL, NULL);
     if(device_result != VK_SUCCESS){
         WL_LOG(WL_FATAL, "failed to create device");
     }
@@ -215,5 +285,7 @@ WLRenderer* wlCreateRenderer(){
 }
 
 void wlDestroyRenderer(WLRenderer* renderer){
+
+    fpDestroyDebugUtilsMessengerEXT(renderer->vulkan_instance, renderer->debug_messenger, NULL);
     vkDestroyInstance(renderer->vulkan_instance, NULL);
 }

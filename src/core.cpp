@@ -62,7 +62,7 @@ void wlLog(WLResult result, const char* file, uint32_t line, const char* func, c
         
         case WL_FATAL:
         printf("[FATAL] %s: %u: %s: %s\n", file, line, func,  msg);
-        fflush(stdout); //prints immediately
+        //fflush(stdout); //prints immediately
         break;
     }
 
@@ -90,7 +90,13 @@ WLEngine* wlCreateEngine(){
         return NULL;
     }
 
-    //engine->pRenderer = wlCreateRenderer();
+    engine->pRenderer = wlCreateRenderer();
+    if(engine->pRenderer==NULL)
+    {
+        WL_LOG(WL_FATAL, "failed to create renderer");
+        wlReleaseAlloc();
+        return NULL;
+    }
 
     engine->pWindow = wlCreateWindow("yo", WL_WINDOWED);
     if(engine->pWindow==NULL){
