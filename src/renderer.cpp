@@ -48,6 +48,12 @@ struct WLRenderer {
     uint32_t currentFrame = 0;
 
 };
+typedef struct WLQueueFamilyIndices {
+    uint32_t graphics_family;
+    uint32_t present_family;
+    uint32_t compute_family;
+    uint32_t transfer_family;
+} WLQueueFamilyIndices;
 
 /*
 this stuff will be used for rasterized projects: rendering 3d models, 2 games, etc
@@ -98,8 +104,35 @@ const char** get_required_vulkan_extensions(uint32_t* pCount){
 
     return extensions; 
 }
-bool is_device_suitable(VkDevice device){
-    
+WLQueueFamilyIndices find_queue_families(VkPhysicalDevice device){
+    WLQueueFamilyIndices family_indices;
+    family_indices.graphics_family = UINT32_MAX;
+    family_indices.present_family = UINT32_MAX;
+    family_indices.compute_family = UINT32_MAX;
+    family_indices.transfer_family = UINT32_MAX;
+
+    // this is what the GPU supports
+    uint32_t queue_family_count = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, NULL);
+    VkQueueFamilyProperties* family_properties = (VkQueueFamilyProperties*)wlAlloc(sizeof(VkQueueFamilyProperties)*queue_family_count);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, family_properties);
+
+    printf("the gpu has: %u queues", queue_family_count);
+
+    for(size_t i=0; i<queue_family_count; i++){
+        if(family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT){
+            family_indices.graphics_family = i;
+        }
+        
+    }
+}
+bool is_device_suitable(VkPhysicalDevice device){
+    VkPhysicalDeviceProperties device_properties;
+    vkGetPhysicalDeviceProperties(device, &device_properties);
+    VkPhysicalDeviceFeatures device_features;
+    vkGetPhysicalDeviceFeatures(device, &device_features);
+
+    WLQueueFamilyIndices queue_indices = find_queue_families(device);
 }
 
 WLRenderer* wlCreateRenderer(){
@@ -153,11 +186,19 @@ WLRenderer* wlCreateRenderer(){
     }
 
     // gettings the list of GPUs
-    VkPhysicalDevice devices[device_count];
-    vkEnumeratePhysicalDevices(renderer->vulkan_instance, &device_count, devices);
+    VkPhysicalDevice physical_devices[device_count];
+    vkEnumeratePhysicalDevices(renderer->vulkan_instance, &device_count, physical_devices);
 
+    // choosing the GPU
+    renderer->physical_device = NULL;
     for(uint32_t i=0; i<device_count; i++){
-        if()
+        if(is_device_suitable(physical_devices[i])){
+            renderer->physical_device = physical_devices[i];
+        }
+    }
+    if(renderer->physical_device==NULL){
+        WL_LOG(WL_FATAL, "no suitable gpu for vulkan");
+        return NULL;
     }
 
 
