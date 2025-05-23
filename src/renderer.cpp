@@ -53,6 +53,7 @@ typedef struct WLQueueFamilyIndices {
     uint32_t present_family;
     uint32_t compute_family;
     uint32_t transfer_family;
+    bool are_complete;
 } WLQueueFamilyIndices;
 
 /*
@@ -110,6 +111,7 @@ WLQueueFamilyIndices find_queue_families(VkPhysicalDevice device){
     family_indices.present_family = UINT32_MAX;
     family_indices.compute_family = UINT32_MAX;
     family_indices.transfer_family = UINT32_MAX;
+    family_indices.are_complete = false;
 
     // this is what the GPU supports
     uint32_t queue_family_count = 0;
@@ -117,14 +119,31 @@ WLQueueFamilyIndices find_queue_families(VkPhysicalDevice device){
     VkQueueFamilyProperties* family_properties = (VkQueueFamilyProperties*)wlAlloc(sizeof(VkQueueFamilyProperties)*queue_family_count);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, family_properties);
 
-    printf("the gpu has: %u queues", queue_family_count);
+    #ifdef WL_DEBUG
+    printf("the gpu has: %u queues\n", queue_family_count);
+    #endif
 
     for(size_t i=0; i<queue_family_count; i++){
-        if(family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT){
+        if( family_indices.graphics_family==UINT32_MAX && family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
             family_indices.graphics_family = i;
+            family_indices.present_family = i; break;
         }
-        
+        if( family_indices.transfer_family==UINT32_MAX && family_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT){
+            family_indices.transfer_family = i; break;
+        }
+        if( family_indices.compute_family==UINT32_MAX && family_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT){
+            family_indices.compute_family = i; break;
+        }
     }
+
+    if( family_indices.graphics_family!=UINT32_MAX &&
+        family_indices.present_family!=UINT32_MAX &&
+        family_indices.compute_family!=UINT32_MAX &&
+        family_indices.transfer_family!=UINT32_MAX ){
+        family_indices.are_complete = true;
+    }
+
+    return family_indices;
 }
 bool is_device_suitable(VkPhysicalDevice device){
     VkPhysicalDeviceProperties device_properties;
@@ -133,6 +152,7 @@ bool is_device_suitable(VkPhysicalDevice device){
     vkGetPhysicalDeviceFeatures(device, &device_features);
 
     WLQueueFamilyIndices queue_indices = find_queue_families(device);
+    return true;
 }
 
 
@@ -175,7 +195,6 @@ VkResult LoadDebugUtilsMessengerEXTFunctions(VkInstance instance) {
 
 WLRenderer* wlCreateRenderer(){
     WLRenderer* renderer = (WLRenderer*)wlAlloc(sizeof(WLRenderer));
-    //renderer->vulkan_instance
 
     #ifdef WL_DEBUG
 
@@ -191,6 +210,8 @@ WLRenderer* wlCreateRenderer(){
 
 ////////////////////////////////////////////////////////
     //      creating the VK instance        //
+
+    WL_LOG(WL_TRACE,"creating vulkan instance...");
 
     VkApplicationInfo app_info = {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -232,6 +253,8 @@ WLRenderer* wlCreateRenderer(){
 /////////////////////////////////////////////////////
     //      debug messenger     //
 
+    WL_LOG(WL_TRACE,"creating debug messenger...");
+
     #ifdef WL_DEBUG
     LoadDebugUtilsMessengerEXTFunctions(renderer->vulkan_instance);
 
@@ -246,7 +269,7 @@ WLRenderer* wlCreateRenderer(){
 /////////////////////////////////////////////////////  
     //      creating the physicsal device   //
 
-    // getting the number of valid GPUs
+    WL_LOG(WL_TRACE,"gettings valid GPUs...");
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(renderer->vulkan_instance, &device_count, NULL);
 
@@ -259,27 +282,31 @@ WLRenderer* wlCreateRenderer(){
     VkPhysicalDevice physical_devices[device_count];
     vkEnumeratePhysicalDevices(renderer->vulkan_instance, &device_count, physical_devices);
 
-    // choosing the GPU
+    WL_LOG(WL_TRACE,"choosing GPU...");
     renderer->physical_device = NULL;
     for(uint32_t i=0; i<device_count; i++){
         if(is_device_suitable(physical_devices[i])){
             renderer->physical_device = physical_devices[i];
+            break;
         }
     }
     if(renderer->physical_device==NULL){
         WL_LOG(WL_FATAL, "no suitable gpu for vulkan");
         return NULL;
     }
-
+    WL_LOG(WL_TRACE,"successfully! found a suitable GPU!s");
 
     VkDeviceCreateInfo device_info = {};
     device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
+    WL_LOG(WL_TRACE,"creating physical device...");
     VkResult device_result;
-    device_result = vkCreateDevice(renderer->physical_device, NULL, NULL, NULL);
+    //device_result = vkCreateDevice(renderer->physical_device, NULL, NULL, NULL);
     if(device_result != VK_SUCCESS){
         WL_LOG(WL_FATAL, "failed to create device");
+        return NULL;
     }
+    WL_LOG(WL_TRACE,"physical device created successfully!");
 
     return NULL;
 }

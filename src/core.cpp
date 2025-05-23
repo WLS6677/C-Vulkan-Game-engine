@@ -52,17 +52,18 @@ void wlPrintAllocatorInfo(){
 void wlLog(WLResult result, const char* file, uint32_t line, const char* func, const char* msg){
     switch(result){
         case WL_TRACE:
-        printf("%s: %u: %s: %s\n", file, line, func,  msg);
+        printf("%s: %u: %s(): %s\n", file + 4, line, func,  msg);
         break;
 
         default:
         case WL_WARNING:
-        printf("[warning] %s: %u: %s: %s\n", file, line, func,  msg);
+        printf("[warning] %s: %u: %s(): %s\n", file + 4, line, func,  msg);
+        fflush(stdout);
         break;
         
         case WL_FATAL:
-        printf("[FATAL] %s: %u: %s: %s\n", file, line, func,  msg);
-        //fflush(stdout); //prints immediately
+        printf("[FATAL] %s: %u: %s(): %s\n", file + 4, line, func,  msg);
+        fflush(stdout); //prints immediately
         break;
     }
 
@@ -94,8 +95,8 @@ WLEngine* wlCreateEngine(){
     if(engine->pRenderer==NULL)
     {
         WL_LOG(WL_FATAL, "failed to create renderer");
-        wlReleaseAlloc();
-        return NULL;
+        //wlReleaseAlloc();
+        //return NULL;
     }
 
     engine->pWindow = wlCreateWindow("yo", WL_WINDOWED);
