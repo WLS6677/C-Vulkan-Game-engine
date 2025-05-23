@@ -231,7 +231,8 @@ VkResult LoadDebugUtilsMessengerEXTFunctions(VkInstance instance) {
     return VK_SUCCESS;
 }
 
-
+///////////////////////////////////////////////
+        // API FUNCTIONS //
 
 WLRenderer* wlCreateRenderer(void* window_handle){
     WLRenderer* renderer = (WLRenderer*)wlAlloc(sizeof(WLRenderer));
