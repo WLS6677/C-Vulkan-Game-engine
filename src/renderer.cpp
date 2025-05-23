@@ -18,6 +18,7 @@ struct WLRenderer{
     // queueueueueueueueueueueueueueues
     VkQueue graphics_queue;
     VkQueue present_queue;
+    VkQueue compute_queue;
     VkQueue transfer_queue;
     // PIPELINE WOOOO
     VkDescriptorSetLayout descriptor_set_layout;
@@ -55,33 +56,13 @@ typedef struct WLQueueFamilyIndices{
     uint32_t compute_family;
     uint32_t transfer_family;
     bool are_complete;
+    uint32_t family_count = 4;
 } WLQueueFamilyIndices;
 typedef struct WLSwapChainSupportDetails{
     VkSurfaceCapabilitiesKHR capabilities;
     VkSurfaceFormatKHR* formats;
     VkPresentModeKHR* present_modes;
 } WLSwapChainSupportDetails;
-
-
-/*
-this stuff will be used for rasterized projects: rendering 3d models, 2 games, etc
-and will need to be rewritten for a raytraced/ raymarched renderer.
-
-    Render pass
-
-    Framebuffers
-
-    Graphics pipelines
-
-    Descriptor layouts/sets
-
-    Vertex/index buffers
-
-    Uniform buffer logicss
-
-    Shader modules (unless shared with compute)
-    
-*/
 
 //the functions needed for creating the VkInstance
 const char** get_required_vulkan_extensions(uint32_t* pCount){
@@ -169,8 +150,15 @@ WLSwapChainSupportDetails query_swap_chain_support_details(VkPhysicalDevice devi
     details.formats = (VkSurfaceFormatKHR*)wlAlloc(format_count*sizeof(VkSurfaceFormatKHR));
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, details.formats);
 
+    uint32_t present_count = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_count, NULL);
+    details.present_modes = (VkPresentModeKHR*)wlAlloc(format_count*sizeof(VkPresentModeKHR));
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_count, details.present_modes);
+    
 
-
+    #ifdef WL_DEBUG 
+    printf("avaialable format count: %u     available present count:%u\n",format_count ,present_count);
+    #endif
 
     return details;
 }
@@ -305,9 +293,8 @@ WLRenderer* wlCreateRenderer(void* window_handle){
 /////////////////////////////////////////////////////
     //      debug messenger     //
 
-    WL_LOG(WL_LOG_TRACE,"creating debug messenger...");
-
     #ifdef WL_DEBUG
+    WL_LOG(WL_LOG_TRACE,"creating debug messenger...");
     LoadDebugUtilsMessengerEXTFunctions(renderer->vulkan_instance);
 
     VkResult debugger_result;
@@ -316,6 +303,7 @@ WLRenderer* wlCreateRenderer(void* window_handle){
     if(debugger_result != VK_SUCCESS){
         WL_LOG(WL_LOG_WARNING, "failed to create debug messenger");
     }
+    WL_LOG(WL_LOG_TRACE,"debug messenger created successfully!");
     #endif //WL_DEBUG
 
 /////////////////////////////////////////////
@@ -337,7 +325,7 @@ WLRenderer* wlCreateRenderer(void* window_handle){
 
 
 /////////////////////////////////////////////////////  
-    //      creating the physicsal device   //
+    //      choosing the physicsal device   //
 
     WL_LOG(WL_LOG_TRACE,"gettings valid GPUs...");
     uint32_t device_count = 0;
@@ -347,6 +335,8 @@ WLRenderer* wlCreateRenderer(void* window_handle){
         WL_LOG(WL_LOG_FATAL, "no GPUs with vulkan support");
         return NULL;
     }
+    printf("found %u GPUs with vulkan support", device_count);
+
 
     // gettings the list of GPUs
     VkPhysicalDevice physical_devices[device_count];
@@ -364,24 +354,98 @@ WLRenderer* wlCreateRenderer(void* window_handle){
         WL_LOG(WL_LOG_FATAL, "no suitable gpu for vulkan");
         return NULL;
     }
-    WL_LOG(WL_LOG_TRACE,"successfully! found a suitable GPU!s");
+    WL_LOG(WL_LOG_TRACE,"successfully! found a suitable GPU!");
+
+/////////////////////////////////////////////////////////////
+        //      creating logical device         //
 
     VkDeviceCreateInfo device_info = {};
     device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-    WL_LOG(WL_LOG_TRACE,"creating physical device...");
+    // getting the queue indices
+    WLQueueFamilyIndices family_indices;
+    family_indices = find_queue_families(renderer->physical_device, renderer->surface);
+
+    // putting the indices into an array
+    uint32_t* family_indices_array = (uint32_t*)wlAlloc(family_indices.family_count*sizeof(uint32_t));
+    family_indices_array[0] = family_indices.graphics_family;
+    family_indices_array[1] = family_indices.present_family;
+    family_indices_array[2] = family_indices.compute_family;
+    family_indices_array[3] = family_indices.transfer_family;
+
+    // making the queue infos
+    uint32_t* used_indices = (uint32_t*)wlAlloc(family_indices.family_count*sizeof(uint32_t));
+    for(size_t i=0; i < family_indices.family_count; i++){
+            used_indices[i] = UINT32_MAX;
+    }
+    const float queue_priority = 1.0f;
+    uint32_t unique_family_count = family_indices.family_count;
+    uint32_t duplicate_offset = 0;
+    bool there_is_duplicate = false;
+
+    VkDeviceQueueCreateInfo* queue_create_infos = (VkDeviceQueueCreateInfo*)wlAlloc(family_indices.family_count*sizeof(VkDeviceQueueCreateInfo));
+    for (size_t i=0; i < family_indices.family_count; i++){
+        bool is_duplicate = false;
+        for(size_t j=0; j < family_indices.family_count; j++){
+            if(family_indices_array[i] == used_indices[j]){
+                there_is_duplicate=true;
+                break;
+            }
+        }
+        if(there_is_duplicate){
+            unique_family_count--;
+            duplicate_offset++;
+            there_is_duplicate=false;
+            continue;
+        }
+        used_indices[i] = family_indices_array[i];
+
+        queue_create_infos[i-duplicate_offset].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queue_create_infos[i-duplicate_offset].queueFamilyIndex = family_indices_array[i];
+        queue_create_infos[i-duplicate_offset].queueCount = 1;
+        queue_create_infos[i-duplicate_offset].pQueuePriorities = &queue_priority;
+    }
+
+    // putting the queue info into the device create info
+    device_info.queueCreateInfoCount = unique_family_count;
+    device_info.pQueueCreateInfos = queue_create_infos;
+
+    // idk what this is
+    VkPhysicalDeviceFeatures deviceFeatures = {};
+    device_info.pEnabledFeatures = &deviceFeatures;
+
+    // device extensions
+    char* device_extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    device_info.enabledExtensionCount = SIZE_OF_ARRAY(device_extensions);
+    device_info.ppEnabledExtensionNames = device_extensions;
+
+    // validation layers
+    #ifdef WL_DEBUG
+    device_info.enabledLayerCount = SIZE_OF_ARRAY(validation_layers);
+    device_info.ppEnabledLayerNames = validation_layers;
+    #else
+    device_info.enabledLayerCount = 0;
+    #endif
+
+    WL_LOG(WL_LOG_TRACE,"creating logical device...");
     VkResult device_result;
-    device_result = vkCreateDevice(renderer->physical_device, NULL, NULL, NULL);
+    device_result = vkCreateDevice(renderer->physical_device, &device_info, NULL, &renderer->device);
     if(device_result != VK_SUCCESS){
-        WL_LOG(WL_LOG_FATAL, "failed to create device");
+        WL_LOG(WL_LOG_FATAL, "failed to create logical device");
         return NULL;
     }
-    WL_LOG(WL_LOG_TRACE,"physical device created successfully!");
+    WL_LOG(WL_LOG_TRACE,"logical device created successfully!");
 
-    return NULL;
+    vkGetDeviceQueue(renderer->device, family_indices.graphics_family, 0, &renderer->graphics_queue);
+    vkGetDeviceQueue(renderer->device, family_indices.present_family, 0, &renderer->present_queue);
+    vkGetDeviceQueue(renderer->device, family_indices.compute_family, 0, &renderer->compute_queue);
+    vkGetDeviceQueue(renderer->device, family_indices.transfer_family, 0, &renderer->transfer_queue);
+
+    return renderer;
 }
 void wlDestroyRenderer(WLRenderer* renderer){
-
+    vkDestroyDevice(renderer->device, NULL);
+    vkDestroySurfaceKHR(renderer->vulkan_instance, renderer->surface, NULL);
     fpDestroyDebugUtilsMessengerEXT(renderer->vulkan_instance, renderer->debug_messenger, NULL);
     vkDestroyInstance(renderer->vulkan_instance, NULL);
 }

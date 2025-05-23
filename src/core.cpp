@@ -38,8 +38,12 @@ uint8_t* wlAlloc(uint32_t request_size){
 
     // changes the allocated ammount to the actual allocated ammount which is +1 from the 
     allocator.allocated_amount += request_size;
-    //wlPrintAllocatorInfo();
-    //WL_LOG(WL_TRACE, "hello");
+
+
+    #ifdef WL_DEBUG
+    printf("allocated %u bytes.     total allocated ammount: %u bytes\n", request_size, allocator.allocated_amount);
+    #endif
+
     return return_pointer;
 }
 void wlPrintAllocatorInfo(){
