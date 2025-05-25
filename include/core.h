@@ -31,7 +31,7 @@ uint8_t* wlAlloc(uint32_t size);
 void wlPrintAllocatorInfo();
 
 // for reading files from disc
-uint8_t* wlReadFile(const char* file_name, size_t* file_size);
+uint8_t* wlReadFile(const char* file_name, uint32_t* file_size);
 
 // debug flags for wlLog
 typedef enum {

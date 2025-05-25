@@ -47,6 +47,9 @@ struct WLPipelineLayout{
     uint32_t descriptor_set_layout_count;
 
     VkDescriptorPool descriptor_pool;
+
+    // the render pass is the order and info about how drawing a frame happens
+    VkRenderPass render_pass;
     
     //uniform buffers
     VkBuffer* pUniform_buffers;
@@ -57,7 +60,6 @@ struct WLPipelineLayout{
 };
 struct WLPipeline {
     VkPipeline pipeline;
-    VkRenderPass render_pass;
 
     // vertex data attibute description
     VkVertexInputAttributeDescription* attribute_descs;
@@ -98,6 +100,7 @@ struct WLRenderer{
 
     // pipelines
     WLPipelineLayout pipeline_layout;
+    WLPipeline simple_graphics_pipeline;
 };
 
 static WLRenderer renderer;
@@ -498,20 +501,44 @@ void wlCreateRenderer(void* window_handle){
 void wlCreateRasterizedRenderPipelineLayout(){
     WLPipelineLayout pipeline_layout;
 
+ //////////////////////////////////////////////////////////////
+             //       render pass        //
+
+    VkRenderPassCreateInfo pass_info;
+    pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+
+    pass_info.pAttachments;
+    pass_info.attachmentCount;
+
+    pass_info.pSubpasses;
+    pass_info.subpassCount;
+    
+    WL_LOG(WL_LOG_TRACE, "creating renderpass..");
+    VkResult layout_result;
+    layout_result = vkCreateRenderPass(renderer.device, &pass_info, NULL, &pipeline_layout.render_pass);
+    if(layout_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create renderpass");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "render pass created successfully!");
+
+ ////////////////////////////////////////////////////////////
+            //        pipeline layout          //
+
     VkPipelineLayoutCreateInfo layout_info = {};
     layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-    //descriptor sets
+    // getting the descriptor set data
     pipeline_layout.pDescriptor_set_layouts = VK_NULL_HANDLE;
     pipeline_layout.descriptor_set_layout_count = 0;
-
+    // descriptor sets
     layout_info.pSetLayouts = pipeline_layout.pDescriptor_set_layouts;
     layout_info.setLayoutCount = pipeline_layout.descriptor_set_layout_count;
-
-    //push constants?
+    // push constants
     layout_info.pPushConstantRanges = VK_NULL_HANDLE;
     layout_info.pushConstantRangeCount = 0;
 
+    WL_LOG(WL_LOG_FATAL, "creating pipeline layout...");
     VkResult layout_result;
     layout_result = vkCreatePipelineLayout(renderer.device, &layout_info, NULL, &pipeline_layout.layout);
     if(layout_result != VK_SUCCESS){
@@ -527,7 +554,139 @@ void wlDestroyRasterizedRenderPipelineLayout(){
     vkDestroyPipelineLayout(renderer.device ,renderer.pipeline_layout.layout, NULL);
 }
 
+void wlCreateBasicPipeLine(){
+    WLPipeline pipeline;
+
+ ///////////////////////////////////////////////////
+            //      shaders      //         
+
+    uint32_t vertex_code_size;
+    uint8_t* vertex_shader_code = wlReadFile("shaders/basic_vert.spv", &vertex_code_size);
+    uint32_t fragment_code_size;
+    uint8_t* fragment_shader_code = wlReadFile("shaders/basic_frag.spv", &fragment_code_size);
+
+    VkShaderModule vertex_shader_module;
+    VkShaderModule fragment_shader_module;
+
+    //vertex shader
+    VkShaderModuleCreateInfo vertex_shader_create_info{};
+    vertex_shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    vertex_shader_create_info.codeSize = vertex_code_size;
+    vertex_shader_create_info.pCode = (const uint32_t*)(vertex_shader_code);
+
+    WL_LOG(WL_LOG_TRACE, "creating vertex shader ...");
+    VkResult vertex_result;
+    vertex_result = vkCreateShaderModule(renderer.device, &vertex_shader_create_info, nullptr, &vertex_shader_module);
+    if(vertex_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create vertex shader");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "vertex shader created successfully!");
+
+    //fragment shader
+    VkShaderModuleCreateInfo fragment_shader_create_info{};
+    fragment_shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    fragment_shader_create_info.codeSize = fragment_code_size;
+    fragment_shader_create_info.pCode = (const uint32_t*)(fragment_shader_code);
+
+    WL_LOG(WL_LOG_TRACE, "creating fragment shader ...");
+    VkResult fragment_result;
+    fragment_result = vkCreateShaderModule(renderer.device, &fragment_shader_create_info, nullptr, &fragment_shader_module);
+    if(fragment_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create fragment shader");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "fragment shader created successfully!");
+
+    VkPipelineShaderStageCreateInfo vertex_shader_stage_info{};
+    vertex_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertex_shader_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertex_shader_stage_info.module = vertex_shader_module;
+    vertex_shader_stage_info.pName = "main";
+    VkPipelineShaderStageCreateInfo fragment_shader_stage_info{};
+    fragment_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragment_shader_stage_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragment_shader_stage_info.module = fragment_shader_module;
+    fragment_shader_stage_info.pName = "main";
+    VkPipelineShaderStageCreateInfo shader_stages[] = { vertex_shader_stage_info, fragment_shader_stage_info };
+
+/////////////////////////////////////////////////////////////////////
+            //      fixed piplestage settings       //
+
+    // Anti Aliassing
+    VkPipelineMultisampleStateCreateInfo multi_sampling_info{};
+    multi_sampling_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multi_sampling_info.sampleShadingEnable = VK_FALSE;
+    multi_sampling_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multi_sampling_info.minSampleShading = 1.0f; // Optional
+    multi_sampling_info.pSampleMask = nullptr; // Optional
+    multi_sampling_info.alphaToCoverageEnable = VK_FALSE; // Optional
+    multi_sampling_info.alphaToOneEnable = VK_FALSE; // Optional
+
+    // Rasterization Stage Stuff
+    VkPipelineRasterizationStateCreateInfo rasterization_state_info = {};
+    rasterization_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterization_state_info.depthClampEnable = VK_FALSE;
+    rasterization_state_info.rasterizerDiscardEnable = VK_FALSE;
+    rasterization_state_info.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterization_state_info.lineWidth = 1.0f;
+    rasterization_state_info.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterization_state_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterization_state_info.depthBiasEnable = VK_FALSE;
+    rasterization_state_info.depthBiasConstantFactor = 0.0f; // Optional
+    rasterization_state_info.depthBiasClamp = 0.0f; // Optional
+    rasterization_state_info.depthBiasSlopeFactor = 0.0f; // Optional
+
+    VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+    color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    color_blend_attachment.blendEnable = VK_TRUE;
+    color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+    color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    
+    // fragement color blending
+    VkPipelineColorBlendStateCreateInfo color_blending_info = {};
+    color_blending_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    color_blending_info.logicOpEnable = VK_FALSE;
+    color_blending_info.logicOp = VK_LOGIC_OP_COPY; // Optional
+    color_blending_info.attachmentCount = 1;
+    color_blending_info.pAttachments = &color_blend_attachment;
+    color_blending_info.blendConstants[0] = 0.0f; // Optional
+    color_blending_info.blendConstants[1] = 0.0f; // Optional
+    color_blending_info.blendConstants[2] = 0.0f; // Optional
+    color_blending_info.blendConstants[3] = 0.0f; // Optional
+
+ /////////////////////////////////////////////////////////////////////
+             //       creating the pipeline        //
+
+    VkGraphicsPipelineCreateInfo pipeline_info;
+    pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeline_info.stageCount = SIZE_OF_ARRAY(shader_stages);
+    pipeline_info.pStages = shader_stages;
+    pipeline_info.pVertexInputState = &vertexInputInfo;
+    pipeline_info.pInputAssemblyState = &inputAssemblyInfo;
+    pipeline_info.pViewportState = &viewPortInfo;
+    pipeline_info.pRasterizationState = &rasterization_state_info;
+    pipeline_info.pMultisampleState = &multi_sampling_info;
+    pipeline_info.pDepthStencilState = nullptr;
+    pipeline_info.pColorBlendState = &color_blending_info;
+    pipeline_info.pDynamicState = &dynamicStateInfo;
+    pipeline_info.layout = renderer.pipeline_layout.layout;
+    pipeline_info.renderPass;
+    pipeline_info.subpass = 0;
+    pipeline_info.basePipelineHandle = VK_NULL_HANDLE; // Optional
+    pipeline_info.basePipelineIndex = -1; // Optional
+
+    vkCreateGraphicsPipelines(renderer.device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline.pipeline);
+
+    renderer.simple_graphics_pipeline = pipeline;
+}
+
 void wlDestroyRenderer(){
+    wlDestroyRasterizedRenderPipelineLayout();
     vkDestroyDevice(renderer.device, NULL);
     vkDestroySurfaceKHR(renderer.vulkan_instance, renderer.surface, NULL);
     fpDestroyDebugUtilsMessengerEXT(renderer.vulkan_instance, renderer.debug_messenger, NULL);

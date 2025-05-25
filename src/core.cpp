@@ -53,7 +53,7 @@ void wlPrintAllocatorInfo(){
 
 
 
-uint8_t* wlReadFile(const char* file_name, size_t* file_size){
+uint8_t* wlReadFile(const char* file_name, uint32_t* file_size){
     FILE* file = fopen(file_name, "rb");
     if (!file) return NULL;
 
