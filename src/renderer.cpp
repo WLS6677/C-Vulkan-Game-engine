@@ -610,7 +610,7 @@ void wlCreateBasicPipeLine(){
     fragment_shader_stage_info.pName = "main";
     VkPipelineShaderStageCreateInfo shader_stages[] = { vertex_shader_stage_info, fragment_shader_stage_info };
 
-/////////////////////////////////////////////////////////////////////
+ /////////////////////////////////////////////////////////////////////
             //      fixed piplestage settings       //
 
     // Anti Aliassing
@@ -683,6 +683,9 @@ void wlCreateBasicPipeLine(){
     vkCreateGraphicsPipelines(renderer.device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline.pipeline);
 
     renderer.simple_graphics_pipeline = pipeline;
+}
+void wlDestroyBasicPipeline(){
+    
 }
 
 void wlDestroyRenderer(){
