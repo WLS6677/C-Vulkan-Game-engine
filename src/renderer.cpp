@@ -2,6 +2,81 @@
 #include <vulkan/vulkan.h>
 #include <glfw3.h>
 
+struct WLSwapChain{
+    VkSwapchainKHR swapchain;
+    
+    VkImage* pSwapchain_images;
+    uint32_t swapChain_image_count;
+
+    VkFormat swapChain_image_Format;
+    VkExtent2D swapChain_extent;
+
+    VkImageView* pSwapChain_image_views;
+    uint32_t swapChain_image_view_count;
+
+    VkFramebuffer* swapChain_framebuffers;
+    uint32_t swapChain_framebuffer_count;
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_buffer_memory;
+
+    //semaphores and stuff for syncronization/Vsync
+    VkSemaphore* pImage_available_semaphores;
+    uint32_t pImage_available_semaphore_count;
+
+    VkSemaphore* pRender_finished_semaphores;
+    uint32_t Render_finished_semaphore_count;
+
+    VkFence* pIn_flight_fences;
+    uint32_t pIn_flight_fence_count;
+
+    uint32_t currentFrame;
+};
+struct WLVertexBuffer {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+};
+struct WLIndexBuffer {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+};
+struct WLPipelineLayout{
+    VkPipelineLayout layout;
+
+    VkDescriptorSetLayout* pDescriptor_set_layouts;
+    uint32_t descriptor_set_layout_count;
+
+    VkDescriptorPool descriptor_pool;
+    
+    //uniform buffers
+    VkBuffer* pUniform_buffers;
+    VkDeviceMemory* pUniform_buffers_memory; 
+    uint32_t uniform_buffer_count;
+
+    void** ppUniformBuffersMapped;
+};
+struct WLPipeline {
+    VkPipeline pipeline;
+    VkRenderPass render_pass;
+
+    // vertex data attibute description
+    VkVertexInputAttributeDescription* attribute_descs;
+    uint32_t attribute_desc_count;
+
+    // shaders
+    const char* vertex_shader;
+    const char* fragment_shader;
+    
+    // settings
+    VkPrimitiveTopology topology;
+    VkCullModeFlags cull_mode;
+    VkPolygonMode polygon_mode;
+};
+struct WLRenderObject {
+    WLPipeline* pPipeline;
+    WLVertexBuffer vertex_buffer;
+    WLIndexBuffer index_buffer;
+};
 struct WLRenderer{
 
     VkInstance vulkan_instance;
@@ -10,45 +85,19 @@ struct WLRenderer{
     VkDebugUtilsMessengerEXT debug_messenger;
     // SwapChain
     VkSurfaceKHR surface;
-    VkSwapchainKHR swapchain;
-    VkImage* pSwapchain_images;
-    VkFormat swapChain_image_Format;
-    VkExtent2D swapChain_extent;
-    VkImageView* pSwapChain_image_views;
+    WLSwapChain swap_chain;
     // queueueueueueueueueueueueueueues
     VkQueue graphics_queue;
     VkQueue present_queue;
     VkQueue compute_queue;
     VkQueue transfer_queue;
-    // PIPELINE WOOOO
-    VkDescriptorSetLayout descriptor_set_layout;
-    VkDescriptorPool descriptor_pool;
-    VkPipelineLayout pipeline_layout;
-    VkRenderPass render_pass;
-    VkPipeline graphics_pipeline;
-    VkVertexInputAttributeDescription* attribute_descs;
-    // buffers yaaay
-    VkFramebuffer* swapChain_framebuffers;
-    VkBuffer staging_buffer;
-    VkDeviceMemory staging_buffer_memory;
-    VkBuffer vertex_buffer;
-    VkDeviceMemory vertex_buffer_memory;
-    VkBuffer index_buffer;
-    VkDeviceMemory index_buffer_memory;
 
-    VkBuffer* pUniformBuffers;
-    VkDeviceMemory* pUniformBuffersMemory;
-    void** ppUniformBuffersMapped;
-
-    // Command Stuff
     VkCommandPool graphicsCommandPool;
     VkCommandPool transferCommandPool;
     VkCommandBuffer* pCommandBuffers;
-    VkSemaphore* pImageAvailableSemaphores;
-    VkSemaphore* pRenderFinishedSemaphores;
-    VkFence* pInFlightFences;
-    uint32_t currentFrame = 0;
 
+    // pipelines
+    WLPipelineLayout pipeline_layout;
 };
 
 static WLRenderer renderer;
@@ -445,6 +494,39 @@ void wlCreateRenderer(void* window_handle){
 
     return;
 }
+
+void wlCreateRasterizedRenderPipelineLayout(){
+    WLPipelineLayout pipeline_layout;
+
+    VkPipelineLayoutCreateInfo layout_info = {};
+    layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+
+    //descriptor sets
+    pipeline_layout.pDescriptor_set_layouts = VK_NULL_HANDLE;
+    pipeline_layout.descriptor_set_layout_count = 0;
+
+    layout_info.pSetLayouts = pipeline_layout.pDescriptor_set_layouts;
+    layout_info.setLayoutCount = pipeline_layout.descriptor_set_layout_count;
+
+    //push constants?
+    layout_info.pPushConstantRanges = VK_NULL_HANDLE;
+    layout_info.pushConstantRangeCount = 0;
+
+    VkResult layout_result;
+    layout_result = vkCreatePipelineLayout(renderer.device, &layout_info, NULL, &pipeline_layout.layout);
+    if(layout_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create pipeline layout");
+        return;
+    }
+
+    renderer.pipeline_layout = pipeline_layout;
+
+    WL_LOG(WL_LOG_FATAL, "pipeline layout created successfully!");
+}
+void wlDestroyRasterizedRenderPipelineLayout(){
+    vkDestroyPipelineLayout(renderer.device ,renderer.pipeline_layout.layout, NULL);
+}
+
 void wlDestroyRenderer(){
     vkDestroyDevice(renderer.device, NULL);
     vkDestroySurfaceKHR(renderer.vulkan_instance, renderer.surface, NULL);

@@ -12,7 +12,7 @@ WLU32Vec2 operator+(WLU32Vec2 l, WLU32Vec2 r);
 
 // Vec3
 typedef struct WLFLOATVec3 {
-    float x, y, Z;
+    float x, y, z;
 } WLFLOATVec3;
 
 #endif

@@ -26,6 +26,9 @@
 //  leaf nodes:
 //  they use the rest of the bits on data (colour/material index)
 
+#ifdef GENERATE_NOISE
+#define RANDOM_BOOL ((bool)rand()%2);
+#endif
 #ifdef WL_DEBUG
     static int debug_voxel_counter = 0;
 
@@ -212,6 +215,12 @@ void generate_SVO_node_recursive(SVOInstance SVO_root, bool (sample_function)(ve
         }
     }
 
+    #ifdef GENERATE_NOISE
+    child_node_mask = RANDOM_BOOL;
+    node_is_full_sample_mask = RANDOM_BOOL;
+    #endif
+    
+
     *root=0;
     uint32_t child_node_count = get_child_node_count(child_node_mask);
 
@@ -330,7 +339,10 @@ void wlGenerateSVOWithRegion(SVOInstance SVO_root, bool (sample_function)(vec3f)
         }
     }
 
-
+    #ifdef GENERATE_NOISE
+    child_node_mask = RANDOM_BOOL;
+    node_is_full_sample_mask = RANDOM_BOOL;
+    #endif
     
 
     WL_LOG(WL_LOG_TRACE, "8 child nodes sampled!");
@@ -396,6 +408,8 @@ void wlGenerateSVOWithRegion(SVOInstance SVO_root, bool (sample_function)(vec3f)
     #endif
     WL_LOG(WL_LOG_TRACE, " recursive Tree generated successfully!");
 }   
-
+void wlReadSVO(SVOInstance SVO_root, void (read_voxel)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/)){
+    
+}
 
 

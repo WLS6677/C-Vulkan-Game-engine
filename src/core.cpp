@@ -53,6 +53,22 @@ void wlPrintAllocatorInfo(){
 
 
 
+uint8_t* wlReadFile(const char* file_name, size_t* file_size){
+    FILE* file = fopen(file_name, "rb");
+    if (!file) return NULL;
+
+    fseek(file, 0, SEEK_END);
+    *file_size = ftell(file);
+    rewind(file);
+
+    uint8_t* buffer = (uint8_t*)malloc(*file_size);
+    fread(buffer, 1, *file_size, file);
+    fclose(file);
+
+    return buffer;
+}
+
+
 void wlLog(WLResult result, const char* file, uint32_t line, const char* func, const char* msg){
     switch(result){
         case WL_LOG_PRINT:
