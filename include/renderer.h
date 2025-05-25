@@ -7,11 +7,8 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 #endif
 
-typedef struct WLRenderer WLRenderer;
-typedef struct WLRenderer WKRenderer;
-
-WLRenderer* wlCreateRenderer(void* window_hanlde);
-void wlRender(WLRenderer* renderer);
-void wlDestroyRenderer(WLRenderer* renderer);
+void wlCreateRenderer(void* window_hanlde);
+void wlRender();
+void wlDestroyRenderer();
 
 #endif

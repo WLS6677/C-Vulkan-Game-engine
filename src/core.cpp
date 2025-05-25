@@ -84,7 +84,6 @@ void wlLog(WLResult result, const char* file, uint32_t line, const char* func, c
 //////////////////////////////////////
 
 struct WLEngine {
-    WLRenderer* pRenderer;
     WLWindow* pWindow;
     const char* engine_name;
 };
@@ -108,19 +107,19 @@ WLEngine* wlCreateEngine(){
 
     void* window_wandle = wlGetRawWindowHandle(engine->pWindow);
     
-    engine->pRenderer = wlCreateRenderer(window_wandle);
-    if(engine->pRenderer==NULL)
+    wlCreateRenderer(window_wandle);
+    if(false)
     {
         WL_LOG(WL_LOG_FATAL, "failed to create renderer");
-        //wlReleaseAlloc();
-        //return NULL;
+        wlReleaseAlloc();
+        return NULL;
     }
 
     return engine;
 
 }
 void wlDestroyEngine(WLEngine* engine){
-    wlDestroyRenderer(engine->pRenderer);
+    wlDestroyRenderer();
     wlDestroyWindow(engine->pWindow);
     wlReleaseAlloc();
 }

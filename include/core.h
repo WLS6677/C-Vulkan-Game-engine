@@ -9,7 +9,17 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#ifndef SIZEOFARRAY
 #define SIZE_OF_ARRAY(arr) (sizeof(arr) / sizeof((arr)[0]))
+#endif
+
+#ifdef WL_MATH
+
+#define vec2u32 WLU32Vec2
+#define vec3f WLFLOATVec3
+
+#endif //WL_MATH
 
 // for miscilanious random allocs so i only need to alloc in the code and not worry about free
 typedef struct WLAllocator WLAllocator;

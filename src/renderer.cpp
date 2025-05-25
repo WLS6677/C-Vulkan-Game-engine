@@ -50,6 +50,9 @@ struct WLRenderer{
     uint32_t currentFrame = 0;
 
 };
+
+static WLRenderer renderer;
+
 typedef struct WLQueueFamilyIndices{
     uint32_t graphics_family;
     uint32_t present_family;
@@ -195,7 +198,6 @@ bool is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface){
     return true;
 }
 
-
 // debugger functions
 static PFN_vkCreateDebugUtilsMessengerEXT fpCreateDebugUtilsMessengerEXT = NULL;
 static PFN_vkDestroyDebugUtilsMessengerEXT fpDestroyDebugUtilsMessengerEXT = NULL;
@@ -234,8 +236,7 @@ VkResult LoadDebugUtilsMessengerEXTFunctions(VkInstance instance) {
 ///////////////////////////////////////////////
         // API FUNCTIONS //
 
-WLRenderer* wlCreateRenderer(void* window_handle){
-    WLRenderer* renderer = (WLRenderer*)wlAlloc(sizeof(WLRenderer));
+void wlCreateRenderer(void* window_handle){
 
     #ifdef WL_DEBUG
 
@@ -285,10 +286,10 @@ WLRenderer* wlCreateRenderer(void* window_handle){
     #endif //WL_DEBUG
 
     VkResult create_result;
-    create_result = vkCreateInstance(&vulkan_instance_info, NULL, &renderer->vulkan_instance);
+    create_result = vkCreateInstance(&vulkan_instance_info, NULL, &renderer.vulkan_instance);
     if(create_result!= VK_SUCCESS){
         WL_LOG(WL_LOG_FATAL, "failed to create VkInstance");
-        return NULL;
+        return;
     }
 
 /////////////////////////////////////////////////////
@@ -296,10 +297,10 @@ WLRenderer* wlCreateRenderer(void* window_handle){
 
     #ifdef WL_DEBUG
     WL_LOG(WL_LOG_TRACE,"creating debug messenger...");
-    LoadDebugUtilsMessengerEXTFunctions(renderer->vulkan_instance);
+    LoadDebugUtilsMessengerEXTFunctions(renderer.vulkan_instance);
 
     VkResult debugger_result;
-    debugger_result = fpCreateDebugUtilsMessengerEXT(renderer->vulkan_instance,&debugger_info, NULL, &renderer->debug_messenger);
+    debugger_result = fpCreateDebugUtilsMessengerEXT(renderer.vulkan_instance,&debugger_info, NULL, &renderer.debug_messenger);
 
     if(debugger_result != VK_SUCCESS){
         WL_LOG(WL_LOG_WARNING, "failed to create debug messenger");
@@ -314,12 +315,12 @@ WLRenderer* wlCreateRenderer(void* window_handle){
     VkResult surface_result;
     if(window_handle==NULL){
         WL_LOG(WL_LOG_FATAL, "window handle is NULL");
-        return NULL;
+        return;
     }
-    surface_result = glfwCreateWindowSurface(renderer->vulkan_instance, (GLFWwindow*)window_handle, NULL, &renderer->surface);
+    surface_result = glfwCreateWindowSurface(renderer.vulkan_instance, (GLFWwindow*)window_handle, NULL, &renderer.surface);
     if(surface_result != VK_SUCCESS){
         WL_LOG(WL_LOG_FATAL, "failed to create surfaceKHR");
-        return NULL;
+        return;
     }
     WL_LOG(WL_LOG_TRACE, "surfaceKHR created successfully!");
 
@@ -330,30 +331,30 @@ WLRenderer* wlCreateRenderer(void* window_handle){
 
     WL_LOG(WL_LOG_TRACE,"gettings valid GPUs...");
     uint32_t device_count = 0;
-    vkEnumeratePhysicalDevices(renderer->vulkan_instance, &device_count, NULL);
+    vkEnumeratePhysicalDevices(renderer.vulkan_instance, &device_count, NULL);
 
     if(device_count==0){
         WL_LOG(WL_LOG_FATAL, "no GPUs with vulkan support");
-        return NULL;
+        return;
     }
     printf("found %u GPUs with vulkan support", device_count);
 
 
     // gettings the list of GPUs
     VkPhysicalDevice physical_devices[device_count];
-    vkEnumeratePhysicalDevices(renderer->vulkan_instance, &device_count, physical_devices);
+    vkEnumeratePhysicalDevices(renderer.vulkan_instance, &device_count, physical_devices);
 
     WL_LOG(WL_LOG_TRACE,"choosing GPU...");
-    renderer->physical_device = VK_NULL_HANDLE;
+    renderer.physical_device = VK_NULL_HANDLE;
     for(uint32_t i=0; i<device_count; i++){
-        if(is_device_suitable(physical_devices[i], renderer->surface)){
-            renderer->physical_device = physical_devices[i];
+        if(is_device_suitable(physical_devices[i], renderer.surface)){
+            renderer.physical_device = physical_devices[i];
             break;
         }
     }
-    if(renderer->physical_device==VK_NULL_HANDLE){
+    if(renderer.physical_device==VK_NULL_HANDLE){
         WL_LOG(WL_LOG_FATAL, "no suitable gpu for vulkan");
-        return NULL;
+        return;
     }
     WL_LOG(WL_LOG_TRACE,"successfully! found a suitable GPU!");
 
@@ -365,7 +366,7 @@ WLRenderer* wlCreateRenderer(void* window_handle){
 
     // getting the queue indices
     WLQueueFamilyIndices family_indices;
-    family_indices = find_queue_families(renderer->physical_device, renderer->surface);
+    family_indices = find_queue_families(renderer.physical_device, renderer.surface);
 
     // putting the indices into an array
     uint32_t* family_indices_array = (uint32_t*)wlAlloc(family_indices.family_count*sizeof(uint32_t));
@@ -430,23 +431,23 @@ WLRenderer* wlCreateRenderer(void* window_handle){
 
     WL_LOG(WL_LOG_TRACE,"creating logical device...");
     VkResult device_result;
-    device_result = vkCreateDevice(renderer->physical_device, &device_info, NULL, &renderer->device);
+    device_result = vkCreateDevice(renderer.physical_device, &device_info, NULL, &renderer.device);
     if(device_result != VK_SUCCESS){
         WL_LOG(WL_LOG_FATAL, "failed to create logical device");
-        return NULL;
+        return;
     }
     WL_LOG(WL_LOG_TRACE,"logical device created successfully!");
 
-    vkGetDeviceQueue(renderer->device, family_indices.graphics_family, 0, &renderer->graphics_queue);
-    vkGetDeviceQueue(renderer->device, family_indices.present_family, 0, &renderer->present_queue);
-    vkGetDeviceQueue(renderer->device, family_indices.compute_family, 0, &renderer->compute_queue);
-    vkGetDeviceQueue(renderer->device, family_indices.transfer_family, 0, &renderer->transfer_queue);
+    vkGetDeviceQueue(renderer.device, family_indices.graphics_family, 0, &renderer.graphics_queue);
+    vkGetDeviceQueue(renderer.device, family_indices.present_family, 0, &renderer.present_queue);
+    vkGetDeviceQueue(renderer.device, family_indices.compute_family, 0, &renderer.compute_queue);
+    vkGetDeviceQueue(renderer.device, family_indices.transfer_family, 0, &renderer.transfer_queue);
 
-    return renderer;
+    return;
 }
-void wlDestroyRenderer(WLRenderer* renderer){
-    vkDestroyDevice(renderer->device, NULL);
-    vkDestroySurfaceKHR(renderer->vulkan_instance, renderer->surface, NULL);
-    fpDestroyDebugUtilsMessengerEXT(renderer->vulkan_instance, renderer->debug_messenger, NULL);
-    vkDestroyInstance(renderer->vulkan_instance, NULL);
+void wlDestroyRenderer(){
+    vkDestroyDevice(renderer.device, NULL);
+    vkDestroySurfaceKHR(renderer.vulkan_instance, renderer.surface, NULL);
+    fpDestroyDebugUtilsMessengerEXT(renderer.vulkan_instance, renderer.debug_messenger, NULL);
+    vkDestroyInstance(renderer.vulkan_instance, NULL);
 }
