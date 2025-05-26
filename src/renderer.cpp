@@ -131,9 +131,10 @@ struct WLRenderer{
     VkQueue compute_queue;
     VkQueue transfer_queue;
 
-    VkCommandPool graphicsCommandPool;
-    VkCommandPool transferCommandPool;
-    VkCommandBuffer* pCommandBuffers;
+    VkCommandPool graphics_command_pool;
+    VkCommandPool transfer_command_pool;
+    VkCommandBuffer* pGraphics_command_buffers;
+    VkCommandBuffer transfer_command_buffer;
 
     // pipelines
     WLRenderPipelineLayout basic_pipeline_layout;
@@ -999,6 +1000,87 @@ void wlCreateBasicPipeLine(){
     renderer.simple_graphics_pipeline = pipeline;
 }
 void wlDestroyBasicPipeline(){
+
+}
+
+void wlCreateCommandBuffers(){
+
+ /////////////////////////////////////////////////////
+         //      creating command pools       //
+
+    WLQueueFamilyIndices family_indices = find_queue_families(renderer.physical_device, renderer.surface);
+
+    VkCommandPoolCreateInfo graphics_pool_info = {};
+    graphics_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    graphics_pool_info.queueFamilyIndex = family_indices.graphics_family;
+    graphics_pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+
+    WL_LOG(WL_LOG_TRACE, "creating graphics pool ...");
+    VkResult graphics_pool_result;
+    graphics_pool_result = vkCreateCommandPool(renderer.device, &graphics_pool_info, NULL, &renderer.graphics_command_pool);
+    if(graphics_pool_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create graphics pool");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "graphics pool created successfully!");   
+    
+    VkCommandPoolCreateInfo transfer_pool_info = {};
+    transfer_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    transfer_pool_info.queueFamilyIndex = family_indices.graphics_family;
+    transfer_pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+
+    WL_LOG(WL_LOG_TRACE, "creating transfer pool ...");
+    VkResult transfer_pool_result;
+    transfer_pool_result = vkCreateCommandPool(renderer.device, &transfer_pool_info, NULL, &renderer.transfer_command_pool);
+    if(transfer_pool_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create transfer pool");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "transfer pool created successfully!"); 
+
+ /////////////////////////////////////////////////////
+         //      allocating buffers       //
+
+    // graphics pool command buffers
+    //
+    // each command buffer will be bound to a swap chain image
+    // it needs to be recorded everyframe so we can update the positions of objects
+    //
+    VkCommandBufferAllocateInfo graphics_buffer_alloc_info = {};
+    graphics_buffer_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    graphics_buffer_alloc_info.commandBufferCount = renderer.swap_chain.image_count;
+    graphics_buffer_alloc_info.commandPool = renderer.graphics_command_pool;
+    graphics_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+    renderer.pGraphics_command_buffers = (VkCommandBuffer*)wlAlloc(renderer.swap_chain.image_count*sizeof(VkCommandBuffer));
+
+    WL_LOG(WL_LOG_TRACE, "creating graphics command buffers ...");
+    VkResult graphics_buffers_result;
+    graphics_buffers_result = vkAllocateCommandBuffers(renderer.device, &graphics_buffer_alloc_info,renderer.pGraphics_command_buffers);
+    if(graphics_buffers_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create graphics command buffers");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "graphics command buffers created successfully!");
+
+    // transfer pool command buffers
+    // just copies the frame buffers to the screen, only need one
+    VkCommandBufferAllocateInfo transfer_buffer_alloc_info = {};
+    transfer_buffer_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    transfer_buffer_alloc_info.commandBufferCount = 1;
+    transfer_buffer_alloc_info.commandPool = renderer.transfer_command_pool;
+    transfer_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+    WL_LOG(WL_LOG_TRACE, "creating transfer command buffers ...");
+    VkResult transfer_buffers_result;
+    transfer_buffers_result = vkAllocateCommandBuffers(renderer.device, &transfer_buffer_alloc_info, &renderer.transfer_command_buffer);
+    if(transfer_buffers_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create transfer command buffers");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "transfer command buffers created successfully!");
+}
+void wlDestroyCommandBuffers(){
     
 }
 

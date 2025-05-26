@@ -26,7 +26,7 @@
 //  leaf nodes:
 //  they use the rest of the bits on data (colour/material index)
 
-#ifdef GENERATE_NOISE
+#ifdef WL_GENERATE_NOISE
 #define RANDOM_BOOL ((bool)rand()%2);
 #endif
 #ifdef WL_DEBUG
@@ -148,7 +148,6 @@ uint32_t sample_8_corners_of_node(vec3f node_position, float node_length,  bool 
         }
     }
     
-    
     return mask;
 }
 
@@ -193,33 +192,34 @@ void generate_SVO_node_recursive(SVOInstance SVO_root, bool (sample_function)(ve
     for (size_t Z = 0; Z < 2; Z++){
         for (size_t Y = 0; Y < 2; Y++){
             for (size_t X = 0; X < 2; X++){
-                uint32_t temp_child_node_index = 0;
-                temp_child_node_index = sample_8_corners_of_node(
+                
+                uint32_t temp_child_node_mask = 0;
+                temp_child_node_mask = sample_8_corners_of_node(
                     vec3f { sample_position.x + X * half_node_length,
                             sample_position.y + Y * half_node_length,
                             sample_position.z + Z * half_node_length },
                     half_node_length,
                     sample_function
                 );
-                
+                #ifndef WL_GENERATE_NOISE
                 // if the node is part of the tree (not air) store it to be iterated over
-                if(temp_child_node_index!=0){
+                if(temp_child_node_mask!=0){
                     child_node_mask |= 1<<(X + 2*Y + 4*Z);
                 }
 
                 // if all 8 corners of the potential node are full, write it to the full nodes mask
-                if(temp_child_node_index==((1<<8)-1)){
+                if(temp_child_node_mask==((1<<8)-1)){
                     node_is_full_sample_mask |= 1<<(X + 2*Y + 4*Z);
                 }
+                #else // WL_GENERATE_NOISE
+                // only generates parent and air nodes and min size voxels
+                if(RANDOM_BOOL){
+                    child_node_mask |= 1<<(X + 2*Y + 4*Z);
+                }
+                #endif // WL_GENERATE_NOISE
             }
         }
     }
-
-    #ifdef GENERATE_NOISE
-    child_node_mask = RANDOM_BOOL;
-    node_is_full_sample_mask = RANDOM_BOOL;
-    #endif
-    
 
     *root=0;
     uint32_t child_node_count = get_child_node_count(child_node_mask);
@@ -232,12 +232,13 @@ void generate_SVO_node_recursive(SVOInstance SVO_root, bool (sample_function)(ve
     print_binary(node_is_full_sample_mask);
     #endif
 
+    
+    
     if(node_is_full_sample_mask == ((1<<8) - 1)){
         *root = material;
-        //DrawRectangle(node_position.x+1.0f, node_position.y+1.0f, full_node_length-3.0f, full_node_length-3.0f, RAYWHITE);
         return;
     }
-
+    
     
 
     *root = SVO_alloc_children_nodes(child_node_count);

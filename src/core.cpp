@@ -106,7 +106,7 @@ struct WLEngine {
 WLEngine* wlCreateEngine(){
     WLEngine* engine;
 
-    wlSetupAllocator(1024*1024*8);
+    wlSetupAllocator(1024*1024*64);
     engine = (WLEngine*)wlAlloc(sizeof(WLEngine));
     if(engine==NULL){
         WL_LOG(WL_LOG_FATAL, "failed to allocate memory for engine");
