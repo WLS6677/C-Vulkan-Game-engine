@@ -8,7 +8,12 @@
         "type_traits": "cpp",
         "utility": "cpp",
         "variant": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "*.vert": "glsl",
+        "*.frag": "glsl",
+        "string": "cpp",
+        "string_view": "cpp",
+        "span": "cpp"
     },
 
     "editor.quickSuggestions": {
@@ -31,6 +36,7 @@
     "tabnine.experimentalAutoImports": false,
 
     // 👇 Set a default C++ standard (optional, but helps parsing)
-    "C_Cpp.default.cppStandard": "c++17"
+    "C_Cpp.default.cppStandard": "c++17",
+    "makefile.configureOnOpen": false
 
 }

@@ -2,9 +2,6 @@
 #define WL_WINDOW
 
 #include <core.h>
-#include <glfw3.h>
-#include <glfw3native.h>
-#include <glm/vec2.hpp>
 
 // this will hold the data of the window, you just need to store it.
 typedef struct WLWindow WLWindow;
@@ -20,16 +17,13 @@ typedef enum  {
 WLWindow* wlCreateWindow(const char* name, WLWindowType type);
 
 // this is for when you change the settings of the window (type).
-WLResult wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type);
+void wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type);
 
-// call this every frame.
-WLResult wlUpdateWindow(WLWindow* window);
-
-// call this even more than once per frame
-WLResult wlPollWindow(WLWindow* window);
+// polls events for the window and updates it.
+void wlUpdateWindow(WLWindow* window);
 
 // optional if you want to close the window but keep the app running.
-WLResult wlCloseWindow(WLWindow* window);
+void wlDestroyWindow(WLWindow* window);
 
 // this will determine the while() loop of the app.
 bool wlWindowShouldClose(WLWindow* window);
@@ -38,6 +32,11 @@ bool wlWindowShouldClose(WLWindow* window);
 WLU32Vec2 wlGetWindowSize(WLWindow* window);
 
 // this is for the renderer to resize the frame buffer when the window is resized
-WLResult wlSetWindowResizeCallback(WLWindow* window, void (*callback)(GLFWwindow*, int /*width*/, int /*height*/));
+//WLResult wlSetWindowResizeCallback(WLWindow* window, void (*callback)(GLFWwindow*, int /*width*/, int /*height*/));
+
+// wrapper for glfwGetRequiredInstanceExtensions
+const char** wlGetRequiredWindowInstanceExtensions(uint32_t* size);
+// for renderer/Vulkan specific functions
+void* wlGetRawWindowHandle(WLWindow* window);
 
 #endif

@@ -7,14 +7,11 @@ int main() {
     printf("debug mode...\n");
     #endif
 
-    WLWindow* pWindow;
+    WL_LOG(WL_LOG_TRACE, "HELLO");
 
-
-    pWindow = wlCreateWindow("goo goo gaa gaa",  WL_WINDOWED);
-    while(!wlWindowShouldClose(pWindow)){
-        wlPollWindow(pWindow);
-    }
-    wlCloseWindow(pWindow);
+    WLEngine* Dave = wlCreateEngine();
+    wlRunEngine(Dave);
+    wlDestroyEngine(Dave);
 
     return 0;
 }

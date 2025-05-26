@@ -1,4 +1,6 @@
 #include <window.h>
+#include <glfw3.h>
+#include <glfw3native.h>
 
 struct WLWindow{
     GLFWwindow* pWindow;
@@ -8,19 +10,20 @@ struct WLWindow{
 };
 
 WLWindow* wlCreateWindow(const char* name, WLWindowType type){
-    glfwInit();
-
     WLWindow* window;
+
+    glfwInit();
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
     // filling in the WLWindow data
-    window = (WLWindow*)malloc(sizeof(WLWindow));
+    window = (WLWindow*)wlAlloc(sizeof(WLWindow));
     if(!window){
-        WL_LOG(WL_FAILED_TO_ALLOCATE_WINDOW);
+        WL_LOG(WL_LOG_FATAL, "failed to allocate window");
         return NULL;
     }
 
     if(name == NULL){
-        WL_LOG(WL_NAME_IS_NULL);
-        free(window);
+        WL_LOG(WL_LOG_FATAL, "window name is NULL");
         return NULL;
     }
 
@@ -40,40 +43,38 @@ WLWindow* wlCreateWindow(const char* name, WLWindowType type){
     window->pWindow = glfwCreateWindow(window->size.x, window->size.y, name, window->pMonitor, NULL);
 
     if(!window->pWindow) {
-
-        WL_LOG(WL_FAILED_TO_CREATE_WINDOW);
-        free(window);
+        WL_LOG(WL_LOG_FATAL, "failed to create glfw window Handle");
         return NULL;
     }
-    WL_LOG(WL_TEST);
 
     return window;
 }
-WLResult wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type){
-    return WL_SUCCESS;
+void wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type){
 }
-WLResult wlUpdateWindow(WLWindow* window){
-    return WL_SUCCESS;
-}
-WLResult wlPollWindow(WLWindow* window){
+void wlUpdateWindow(WLWindow* window){
     glfwPollEvents();
-    return WL_SUCCESS;
 }
-WLResult wlCloseWindow(WLWindow* window){
-    WLResult result = WL_SUCCESS; //for debugging
-
+void wlDestroyWindow(WLWindow* window){
     glfwDestroyWindow(window->pWindow);
-
-    free(window);
-
-    WL_LOG(result);
-    return result;
+    glfwTerminate();
 }
 bool wlWindowShouldClose(WLWindow* window){
+    if(window==NULL){
+        WL_LOG(WL_LOG_WARNING, "window doesnt exist"); 
+        return false;
+    }
     return glfwWindowShouldClose(window->pWindow);
 }
 WLU32Vec2 getWindowSize(WLWindow* window){
     WLU32Vec2 size{0,0};
     return size;
 }
-//*/
+const char** wlGetRequiredWindowInstanceExtensions(uint32_t* pSize){
+    return glfwGetRequiredInstanceExtensions(pSize);
+}
+void* wlGetRawWindowHandle(WLWindow* window){
+    return (void*)window->pWindow;
+}
+
+
+

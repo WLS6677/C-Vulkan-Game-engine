@@ -19,7 +19,7 @@ LD = g++
 
 DEBUGFLAGS = -g -DWL_DEBUG
 CFLAGS = -std=c++17 -D_XOPEN_SOURCE=700 -fwrapv \
-         -fno-delete-null-pointer-checks -fno-strict-overflow -fno-strict-aliasing \
+         -fno-delete-null-pointer-checks -fno-strict-overflow -fno-strict-aliasing
 
 
 OPT = -O3
@@ -28,17 +28,20 @@ FILE_NUM = 0
 #compiling source files
 build/%.o: src/%.cpp
 	@if not exist build mkdir build
-	$(CC) -c -o $@ $< $(INCLUDEPATHS) $(CFLAGS) $(OPT)
+	@$(CC) -c -o $@ $< $(INCLUDEPATHS) $(CFLAGS) $(OPT)
 
 #linking the compiled files
 $(EXECUTABLE_NAME): $(OBJECTS)
-	echo Linking with $(LD)...
-	$(LD) $(OBJECTS) -o $(EXECUTABLE_NAME) $(CFLAGS) $(LIBPATHS) $(LIBS) -lm
-	echo Successfully built: $(EXECUTABLE_NAME)
+	@glslangValidator -V shaders/basic.vert -o shaders/basic_vert.spv
+	@glslangValidator -V shaders/basic.frag -o shaders/basic_frag.spv
+	@echo Linking with $(LD)...
+	@$(LD) $(OBJECTS) -o $(EXECUTABLE_NAME) $(CFLAGS) $(LIBPATHS) $(LIBS) -lm
+	@echo Successfully built: $(EXECUTABLE_NAME)
 
 build: $(EXECUTABLE_NAME)
+	
 
-debug: CFLAGS += $(DEBUGFLAGS)
+debug: CFLAGS += $(DEBUGFLAGS) 
 debug: OPT = -O0
 debug: build
 
@@ -46,4 +49,6 @@ clean:
 	@if exist build\* del /s /q build\*
 	@if exist $(EXECUTABLE_NAME) del $(EXECUTABLE_NAME)
 	@if not exist build mkdir build
+	@cls
 cleanbuild: clean build
+	

@@ -5,6 +5,4 @@ potential games i want to make using the engine: a voxel world manufactoring gam
 to build the engine, run "mingw32-make" in the main folder
 
 
-goo goo gaa gaa
-
 
