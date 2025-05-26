@@ -170,7 +170,11 @@ void generate_SVO_node_recursive(SVOInstance SVO_root, bool (sample_function)(ve
     float full_node_length = SMALLEST_VOXEL_LENGTH * (1<<node_voxel_level);
 
     if(node_voxel_level==smallest_level){
+        #ifndef WL_GENERATE_NOISE
         *root = material;
+        #else 
+        *root = (rand() & (UINT32_MAX-1));
+        #endif
         return;
     }
 

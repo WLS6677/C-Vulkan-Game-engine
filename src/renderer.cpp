@@ -1,6 +1,7 @@
 #include <renderer.h>
 #include <vulkan/vulkan.h>
 #include <glfw3.h>
+#include <string.h>
 
 struct WLSwapChain{
     VkSwapchainKHR swapchain;
@@ -36,6 +37,7 @@ typedef struct {
     vec3f Pos, Color;
 } WLVertex;
 #define WL_VERTEX_ATTRIBUTE_COUNT 2
+#define GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES (1024*1024*8)
 
 #define WL_DEBUG
 
@@ -102,19 +104,16 @@ static const WLVertexInfo WL_VERTEX_INFO = {
         }
     }   
 };
-typedef struct WLVertexBuffer {
-    
+typedef struct WLGPUVertexBuffer {
     VkBuffer buffer;
+    uint32_t vertex_count;
     VkDeviceMemory memory;
-} WLVertexBuffer;
-typedef struct WLIndexBuffer {
-    VkBuffer buffer;
-    VkDeviceMemory memory;
-} WLIndexBuffer;
+} WLGPUVertexBuffer;
 typedef struct WLRenderObject {
     WLPipeline* pPipeline;
-    WLVertexBuffer vertex_buffer;
-    WLIndexBuffer index_buffer;
+    WLVertex* pVertex_buffer;
+    uint32_t vertex_count;
+    uint32_t unique_id;
 } WLRenderObject;
 struct WLRenderer{
 
@@ -140,6 +139,7 @@ struct WLRenderer{
     WLRenderPipelineLayout basic_pipeline_layout;
     bool pipeline_layout_exists;
     WLPipeline simple_graphics_pipeline;
+    WLGPUVertexBuffer vertex_buffer;
 };
 
 static WLRenderer renderer = {};
@@ -1081,7 +1081,7 @@ void wlCreateCommandBuffers(){
     WL_LOG(WL_LOG_TRACE, "transfer command buffers created successfully!");
 }
 void wlDestroyCommandBuffers(){
-    
+
 }
 
 void wlDestroyRenderer(){
@@ -1091,3 +1091,221 @@ void wlDestroyRenderer(){
     fpDestroyDebugUtilsMessengerEXT(renderer.vulkan_instance, renderer.debug_messenger, NULL);
     vkDestroyInstance(renderer.vulkan_instance, NULL);
 }
+
+
+///////////////////////////////////////////////
+       // RENDERING API FUNCTIONS //
+ 
+typedef struct wl_object_data {
+    uint32_t byte_offset, vertex_count;
+} wl_object_data;
+
+// this works only for one pipeline type for now
+uint32_t get_required_memory_index(VkMemoryRequirements requirements, uint32_t desired_properties_mask){
+    VkPhysicalDeviceMemoryProperties properties;
+    vkGetPhysicalDeviceMemoryProperties(renderer.physical_device, &properties);
+    
+    for (size_t i = 0; i < properties.memoryTypeCount; i++){
+        if(
+            (requirements.memoryTypeBits & (1<<i)) && 
+            ((properties.memoryTypes[i].propertyFlags & desired_properties_mask) == desired_properties_mask)
+        ){
+            return i;
+        }
+    }
+    
+    #ifdef WL_DEBUG
+    printf("no memory type supports flags: %d\n", desired_properties_mask);
+    #endif
+
+    WL_LOG(WL_LOG_FATAL, "failed to find suitable memory type");
+
+    return UINT32_MAX;
+}
+void initVertexBuffer(WLRenderObject* pObjects, uint32_t object_count){
+
+    // holds the index of the next free index in the main buffer using bytes
+    static uint32_t next_free_byte_offset_counter = 0;
+    static uint32_t total_vertex_count = 0;
+    static uint32_t total_object_count = 0;
+    
+    // temporary buffer to put the initial SVO meshes into the GPU
+    uint8_t* main_buffer = wlAlloc(GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES);
+    uint32_t max_vertex_count = GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES/sizeof(WLVertex);
+    // maximum of 128 chunks for now
+    wl_object_data* pObjects_data = (wl_object_data*)wlAlloc(128*sizeof(wl_object_data));
+
+    for(size_t i = 0; i < object_count; i++){
+        uint32_t vertex_count = pObjects[i].vertex_count;
+
+        if(total_vertex_count + vertex_count >= max_vertex_count){
+            //TODO: free buffer memory
+            WL_LOG(WL_LOG_FATAL, "render object vertices exceed memory limit");
+            return;
+            //TODO: make it ignore the extra vertices safely instead of fully crash
+        }
+
+        memcpy(main_buffer + next_free_byte_offset_counter, pObjects[i].pVertex_buffer, vertex_count*sizeof(WLVertex));
+        pObjects_data[total_object_count].vertex_count = vertex_count;
+        pObjects_data[total_object_count].byte_offset = next_free_byte_offset_counter;
+
+        next_free_byte_offset_counter += vertex_count*sizeof(WLVertex);
+        total_vertex_count += vertex_count;
+        total_object_count++;
+    }
+
+    //TODO: make a dynamic version of this for updating chunks
+
+ /////////////////////////////////////////////////////////
+            //      vertex buffer       //
+
+    // cpu handle of buffer
+    VkBufferCreateInfo vert_buffer_info = {};
+    vert_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    vert_buffer_info.size = GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES;
+    vert_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    vert_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    WL_LOG(WL_LOG_TRACE, "creating vertex buffer ...");
+    VkResult buffer_result;
+    buffer_result = vkCreateBuffer(renderer.device, &vert_buffer_info, NULL, &renderer.vertex_buffer.buffer);
+    if(buffer_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create vertex buffer");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "vertex buffer created successfully!");
+
+    VkMemoryRequirements vert_memory_requirements;
+    vkGetBufferMemoryRequirements(renderer.device, renderer.vertex_buffer.buffer, &vert_memory_requirements);
+
+    //allocating buffer on GPU
+    VkMemoryAllocateInfo vert_alloc_info = {};
+    vert_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    vert_alloc_info.allocationSize = vert_memory_requirements.size;
+    vert_alloc_info.memoryTypeIndex = get_required_memory_index(vert_memory_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    WL_LOG(WL_LOG_TRACE, "allocating vertex buffer memory ...");
+    VkResult vert_aloc_result;
+    vert_aloc_result = vkAllocateMemory(renderer.device, &vert_alloc_info, NULL, &renderer.vertex_buffer.memory);
+    if(vert_aloc_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to allocate vertex buffer memory ");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "vertex buffer memory allocated successfully!");
+
+    //binding memory
+    WL_LOG(WL_LOG_TRACE, "binding vertex buffer memory ...");
+    VkResult vert_bind_result;
+    vert_bind_result = vkBindBufferMemory(renderer.device, renderer.vertex_buffer.buffer, renderer.vertex_buffer.memory, 0);
+    if(vert_bind_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to bind vertex buffer memory");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "vertex buffer memory bound successfully!");
+
+ /////////////////////////////////////////////////////////
+            //      staging buffer       //
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+
+    // cpu handle of buffer
+    VkBufferCreateInfo staging_buffer_info = {};
+    staging_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    staging_buffer_info.size = GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES;
+    staging_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    staging_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    WL_LOG(WL_LOG_TRACE, "creating staging buffer ...");
+    VkResult staging_buffer_result;
+    staging_buffer_result = vkCreateBuffer(renderer.device, &staging_buffer_info, NULL, &staging_buffer);
+    if(buffer_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create staging buffer");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "staging buffer created successfully!");
+
+    VkMemoryRequirements staging_memory_requirements;
+    vkGetBufferMemoryRequirements(renderer.device, staging_buffer, &staging_memory_requirements);
+
+    // allocating memory on GPU
+    VkMemoryAllocateInfo staging_alloc_info = {};
+    staging_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    staging_alloc_info.allocationSize = staging_memory_requirements.size;
+    staging_alloc_info.memoryTypeIndex = get_required_memory_index(staging_memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    WL_LOG(WL_LOG_TRACE, "allocating staging buffer memory ...");
+    VkResult staging_aloc_result;
+    staging_aloc_result = vkAllocateMemory(renderer.device, &staging_alloc_info, NULL, &staging_memory);
+    if(staging_aloc_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to allocate staging buffer memory ");
+        vkDestroyBuffer(renderer.device, staging_buffer, NULL);
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "staging buffer memory allocated successfully!");
+
+ /////////////////////////////////////////////////////
+           //       binding memory      //
+
+    WL_LOG(WL_LOG_TRACE, "binding staging buffer memory ...");
+    VkResult staging_bind_result;
+    staging_bind_result = vkBindBufferMemory(renderer.device, staging_buffer, staging_memory, 0);
+    if(staging_bind_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to bind staging buffer memory");
+        vkFreeMemory(renderer.device, staging_memory, NULL);
+        vkDestroyBuffer(renderer.device, staging_buffer, NULL);
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "staging buffer memory bound successfully!");
+
+    void* staging_buffer_data;
+    VkResult map_result = vkMapMemory(renderer.device, staging_memory, 0, GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES, 0, &staging_buffer_data);
+    if(map_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to map staging buffer memory");
+        vkFreeMemory(renderer.device, staging_memory, NULL);
+        vkDestroyBuffer(renderer.device, staging_buffer, NULL);
+        return;
+    }
+
+    //actually writing the data to the GPu
+ //////////////////////////////////////////////////////
+    memcpy(staging_buffer_data, main_buffer, GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES);
+ //////////////////////////////////////////////////////
+
+    vkUnmapMemory(renderer.device, staging_memory);
+
+    // recording command buffers
+    VkCommandBufferBeginInfo transfer_command_begin_info = {};
+    transfer_command_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    vkBeginCommandBuffer(renderer.transfer_command_buffer, &transfer_command_begin_info);
+
+    VkBufferCopy copy_region = {};
+    copy_region.srcOffset = 0;
+    copy_region.dstOffset = 0;
+    copy_region.size = total_vertex_count * sizeof(WLVertex);
+    vkCmdCopyBuffer(renderer.transfer_command_buffer, staging_buffer, renderer.vertex_buffer.buffer, 1, &copy_region);
+
+    vkEndCommandBuffer(renderer.transfer_command_buffer);
+
+    // submitting command buffer
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &renderer.transfer_command_buffer;
+    vkQueueSubmit(renderer.transfer_queue, 1, &submit_info, NULL);
+    vkQueueWaitIdle(renderer.transfer_queue);
+
+    // cleanup
+    vkFreeMemory(renderer.device, staging_memory, NULL);
+    vkDestroyBuffer(renderer.device, staging_buffer, NULL);
+}
+
+void updateVertexBuffer(WLRenderObject* pObjects, uint32_t object_count){
+for (size_t i = 0; i < object_count; i++){
+        
+    }
+}
+
+
+

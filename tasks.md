@@ -10,7 +10,8 @@ pipelinelayout >/
 renderpass >/
 shaders >/
 pipeline >/
-command buffer
+vertex buffer assembler >/
+ rendering command buffer
 render function that does a render pass with command bufffers and intakes render objects
 
 render our first triangle
@@ -44,14 +45,14 @@ make some FL studio music
 //////////////////////////////////////////
 
 
-WL_LOG(WL_LOG_TRACE, "creating  ...");
+    WL_LOG(WL_LOG_TRACE, "creating  ...");
     VkResult layout_result;
     layout_result = ;
     if(layout_result != VK_SUCCESS){
         WL_LOG(WL_LOG_FATAL, "failed to create ");
         return;
     }
-WL_LOG(WL_LOG_TRACE, " created successfully!");
+    WL_LOG(WL_LOG_TRACE, " created successfully!");
 
 
 
@@ -62,9 +63,9 @@ WL_LOG(WL_LOG_TRACE, " created successfully!");
 
 
 
-for (size_t i = 0; i < ; i++){
+    for (size_t i = 0; i < ; i++){
         
-}
+    }
 
 
 

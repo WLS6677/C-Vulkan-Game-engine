@@ -10,7 +10,10 @@
         "variant": "cpp",
         "typeinfo": "cpp",
         "*.vert": "glsl",
-        "*.frag": "glsl"
+        "*.frag": "glsl",
+        "string": "cpp",
+        "string_view": "cpp",
+        "span": "cpp"
     },
 
     "editor.quickSuggestions": {
