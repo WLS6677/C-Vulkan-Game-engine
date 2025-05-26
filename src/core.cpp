@@ -131,6 +131,8 @@ WLEngine* wlCreateEngine(){
         return NULL;
     }
 
+    wlCreateRasterizedRenderPipelineLayout();
+
     return engine;
 
 }

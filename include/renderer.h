@@ -11,4 +11,8 @@ void wlCreateRenderer(void* window_hanlde);
 void wlRender();
 void wlDestroyRenderer();
 
+void wlCreateSwapChain(void* window_handle);
+void wlCreateRasterizedRenderPipelineLayout();
+void wlCreateBasicPipeLine();
+
 #endif

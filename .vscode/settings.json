@@ -8,7 +8,10 @@
         "type_traits": "cpp",
         "utility": "cpp",
         "variant": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "*.vert": "glsl",
+        "*.frag": "glsl"
+
     },
 
     "editor.quickSuggestions": {

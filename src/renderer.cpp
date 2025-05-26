@@ -31,33 +31,15 @@ struct WLSwapChain{
 
     uint32_t currentFrame;
 };
-struct WLVertexBuffer {
-    VkBuffer buffer;
-    VkDeviceMemory memory;
-};
-struct WLIndexBuffer {
-    VkBuffer buffer;
-    VkDeviceMemory memory;
-};
-struct WLPipelineLayout{
-    VkPipelineLayout layout;
 
-    VkDescriptorSetLayout* pDescriptor_set_layouts;
-    uint32_t descriptor_set_layout_count;
+typedef struct {
+    vec3f Pos, Color;
+} WLVertex;
+#define WL_VERTEX_ATTRIBUTE_COUNT 2
 
-    VkDescriptorPool descriptor_pool;
+#define WL_DEBUG
 
-    // the render pass is the order and info about how drawing a frame happens
-    VkRenderPass render_pass;
-    
-    //uniform buffers
-    VkBuffer* pUniform_buffers;
-    VkDeviceMemory* pUniform_buffers_memory; 
-    uint32_t uniform_buffer_count;
-
-    void** ppUniformBuffersMapped;
-};
-struct WLPipeline {
+typedef struct WLPipeline {
     VkPipeline pipeline;
 
     // vertex data attibute description
@@ -72,12 +54,69 @@ struct WLPipeline {
     VkPrimitiveTopology topology;
     VkCullModeFlags cull_mode;
     VkPolygonMode polygon_mode;
+} WLPipeline;
+typedef struct WLRenderPipelineLayout{
+    // describes the how and what data is passed to the shaders in the pipeline
+    VkPipelineLayout layout;
+
+    // the render pass is the order and info about how drawing a frame happens
+    VkRenderPass render_pass;
+
+    // the pipelines are the code basically and they are tied to subpasses
+    WLPipeline* pPipelines;
+    uint32_t pipeline_count;
+
+    VkDescriptorSetLayout* pDescriptor_set_layouts;
+    uint32_t descriptor_set_layout_count;
+    VkDescriptorPool descriptor_pool;
+
+    //uniform buffers
+    VkBuffer* pUniform_buffers;
+    VkDeviceMemory* pUniform_buffers_memory; 
+    uint32_t uniform_buffer_count;
+
+    void** ppUniformBuffersMapped;
+} WLRenderPipelineLayout;
+typedef struct {
+    
+    VkVertexInputBindingDescription bind_description;
+    VkVertexInputAttributeDescription pAttribute_descriptions[WL_VERTEX_ATTRIBUTE_COUNT];
+} WLVertexInfo;
+static const WLVertexInfo WL_VERTEX_INFO = {
+    .bind_description = {
+        .binding = 0,
+        .stride = sizeof(WLVertex),
+        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+    },
+    .pAttribute_descriptions = {
+        /*position*/{
+        0,  // location
+        0,  // binding
+        VK_FORMAT_R32G32B32_SFLOAT,
+        0,  // offset inside vertex
+        },
+        /*Color*/{
+        1,  // location
+        0,  // binding
+        VK_FORMAT_R32G32B32_SFLOAT,
+        sizeof(vec3f),  // offset inside vertex
+        }
+    }   
 };
-struct WLRenderObject {
+typedef struct WLVertexBuffer {
+    
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+} WLVertexBuffer;
+typedef struct WLIndexBuffer {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+} WLIndexBuffer;
+typedef struct WLRenderObject {
     WLPipeline* pPipeline;
     WLVertexBuffer vertex_buffer;
     WLIndexBuffer index_buffer;
-};
+} WLRenderObject;
 struct WLRenderer{
 
     VkInstance vulkan_instance;
@@ -98,11 +137,12 @@ struct WLRenderer{
     VkCommandBuffer* pCommandBuffers;
 
     // pipelines
-    WLPipelineLayout pipeline_layout;
+    WLRenderPipelineLayout basic_pipeline_layout;
+    bool pipeline_layout_exists;
     WLPipeline simple_graphics_pipeline;
 };
 
-static WLRenderer renderer;
+static WLRenderer renderer = {};
 
 typedef struct WLQueueFamilyIndices{
     uint32_t graphics_family;
@@ -211,7 +251,7 @@ WLSwapChainSupportDetails query_swap_chain_support_details(VkPhysicalDevice devi
     
 
     #ifdef WL_DEBUG 
-    pmode_rintf("avaialable format count: %u     available present count:%u\n",format_count ,details.present_mode_count);
+    printf("avaialable format count: %u     available present count:%u\n",details.format_count ,details.present_mode_count);
     #endif
 
     return details;
@@ -494,6 +534,10 @@ void wlCreateRenderer(void* window_handle){
     vkGetDeviceQueue(renderer.device, family_indices.compute_family, 0, &renderer.compute_queue);
     vkGetDeviceQueue(renderer.device, family_indices.transfer_family, 0, &renderer.transfer_queue);
 
+    wlCreateSwapChain(window_handle);
+    wlCreateRasterizedRenderPipelineLayout();
+    wlCreateBasicPipeLine();
+
     return;
 }
 
@@ -506,30 +550,38 @@ void wlCreateSwapChain(void* window_handle){
 
     WLSwapChainSupportDetails swapchain_support = query_swap_chain_support_details(renderer.physical_device, renderer.surface);
 
+    WL_LOG(WL_LOG_TRACE, "choosing format");
     // choosing surface format
-    VkSurfaceFormatKHR surface_format = {};
+    if(swapchain_support.format_count == 0){
+        WL_LOG(WL_LOG_FATAL, "no available surface formats");
+    }
+    VkSurfaceFormatKHR surface_format = swapchain_support.pFormats[0];
+    printf("Desired Format %d, ColorSpace %d\n", VK_FORMAT_B8G8R8A8_SRGB, VK_COLORSPACE_SRGB_NONLINEAR_KHR);
     for (size_t i = 0; i < swapchain_support.format_count; i++)
-    {
+    {   
+        printf("checking the surface with: Format %d, ColorSpace %d\n", swapchain_support.pFormats[i].format, swapchain_support.pFormats[i].colorSpace);
         if(
             swapchain_support.pFormats[i].format == VK_FORMAT_B8G8R8A8_SRGB &&
             swapchain_support.pFormats[i].colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR
         ){
             surface_format = swapchain_support.pFormats[i];
+            break;
         }
     }
     swapchain.surface_format = surface_format;
+    
+    #ifdef WL_DEBUG
+    printf("Format %d, ColorSpace %d\n", swapchain.surface_format, swapchain.surface_format.colorSpace);
+    #endif
 
     // choosing present mode
-    VkPresentModeKHR present_mode = {};
+    VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
     for (size_t i = 0; i < swapchain_support.present_mode_count; i++){
         if(
             swapchain_support.pPresent_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR
         ){
             present_mode = swapchain_support.pPresent_modes[i];
         }
-    }
-    if(present_mode != VK_PRESENT_MODE_MAILBOX_KHR){
-        present_mode = VK_PRESENT_MODE_FIFO_KHR;
     }
     swapchain.present_mode = present_mode;
 
@@ -593,6 +645,7 @@ void wlCreateSwapChain(void* window_handle){
     VkResult swapchain_result;
     swapchain_result = vkCreateSwapchainKHR(renderer.device, &swapchain_info, NULL, &swapchain.swapchain);
     if(swapchain_result != VK_SUCCESS){
+        printf("error code: %d\n", swapchain_result);
         WL_LOG(WL_LOG_FATAL, "failed to create swapchain");
         return;
     }
@@ -605,6 +658,8 @@ void wlCreateSwapChain(void* window_handle){
 
  //////////////////////////////////////////////////////////
             //      swapchain image views      //
+
+    WL_LOG(WL_LOG_TRACE, "creating image views ...");
 
     swapchain.pImage_views = (VkImageView*)wlAlloc(swapchain.image_count*sizeof(VkImageView));
     for (size_t i = 0; i < swapchain.image_count; i++){
@@ -641,46 +696,99 @@ void wlCreateSwapChain(void* window_handle){
  //////////////////////////////////////////////////////////
             //      swapchain buffers      //
 
+    if(!renderer.pipeline_layout_exists){
+        WL_LOG(WL_LOG_WARNING, "render layout not created, no frame buffers for you");
+        renderer.swap_chain = swapchain;
+        return;
+    }
+
+    WL_LOG(WL_LOG_TRACE, "creating swap chain buffers ...");
+
     swapchain.pFramebuffers = (VkFramebuffer*)wlAlloc(swapchain.image_count*sizeof(VkFramebuffer));
     for (size_t i = 0; i < swapchain.image_count; i++){
         VkImageView attachments[] = {
-	    swapchain.pImage_views[i];
-	    // other attachments
+	        swapchain.pImage_views[i]
+	        // other attachments
         };
 
         VkFramebufferCreateInfo framebuffer_info = {};
         framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebuffer_info.renderPass = renderPass;
-        framebuffer_info.height = swapChainExtent.height;
-        framebuffer_info.width = swapChainExtent.width;
-        framebuffer_info.attachmentCount = 1;
+        framebuffer_info.renderPass = renderer.basic_pipeline_layout.render_pass;
+        framebuffer_info.height = swapchain.extent.height;
+        framebuffer_info.width = swapchain.extent.width;
+        framebuffer_info.attachmentCount = SIZE_OF_ARRAY(attachments);
         framebuffer_info.pAttachments = attachments;
         framebuffer_info.layers = 1;
 
-    vkCreateFramebuffer(device, &framebuffer_info, nullptr, &swapChainFramebuffers[i])
-
+        VkResult frame_buffer_result;
+        frame_buffer_result = vkCreateFramebuffer(renderer.device, &framebuffer_info, nullptr, &swapchain.pFramebuffers[i]);
+        if(frame_buffer_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create frame buffer");
+        return;
+        }
     }
 }
+void wlReCreateSwapChain(void* window_handle);
+void wlDestroySwapChain();
 
 void wlCreateRasterizedRenderPipelineLayout(){
-    WLPipelineLayout pipeline_layout;
+    WLRenderPipelineLayout pipeline_layout = {};
 
  //////////////////////////////////////////////////////////////
              //       render pass        //
 
-    VkRenderPassCreateInfo pass_info;
-    pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    #ifdef WL_DEBUG
+    printf("suface format: %d, surface colour space:%d\n", renderer.swap_chain.surface_format.format, renderer.swap_chain.surface_format.colorSpace);
+    #endif
+          
+    VkRenderPassCreateInfo render_pass_info = {};
+    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 
-    pass_info.pAttachments;
-    pass_info.attachmentCount;
+    // colour attachments
+    VkAttachmentDescription color_attachment = {};
+    color_attachment.format = renderer.swap_chain.surface_format.format;
+    color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-    pass_info.pSubpasses;
-    pass_info.subpassCount;
+    VkAttachmentReference color_attachment_ref = {};
+    color_attachment_ref.attachment = 0; // index of the attachment in the attachment array
+    color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     
+    render_pass_info.attachmentCount = 1;
+    render_pass_info.pAttachments = &color_attachment;
+
+    // sub passes
+    VkSubpassDescription sub_pass_decription = {};
+    sub_pass_decription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    sub_pass_decription.colorAttachmentCount = 1;
+    sub_pass_decription.pColorAttachments = &color_attachment_ref;
+    
+    render_pass_info.subpassCount = 1;
+    render_pass_info.pSubpasses = &sub_pass_decription;
+ 
+    // dependancies
+    VkSubpassDependency dependency = {};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    render_pass_info.dependencyCount = 1;
+    render_pass_info.pDependencies = &dependency;
+
+    // creating the render pass
+   
     WL_LOG(WL_LOG_TRACE, "creating renderpass..");
-    VkResult layout_result;
-    layout_result = vkCreateRenderPass(renderer.device, &pass_info, NULL, &pipeline_layout.render_pass);
-    if(layout_result != VK_SUCCESS){
+    VkResult render_pass_result;
+    render_pass_result = vkCreateRenderPass(renderer.device, &render_pass_info, NULL, &pipeline_layout.render_pass);
+    if(render_pass_result != VK_SUCCESS){
         WL_LOG(WL_LOG_FATAL, "failed to create renderpass");
         return;
     }
@@ -702,7 +810,7 @@ void wlCreateRasterizedRenderPipelineLayout(){
     layout_info.pPushConstantRanges = VK_NULL_HANDLE;
     layout_info.pushConstantRangeCount = 0;
 
-    WL_LOG(WL_LOG_FATAL, "creating pipeline layout...");
+    WL_LOG(WL_LOG_TRACE, "creating pipeline layout...");
     VkResult layout_result;
     layout_result = vkCreatePipelineLayout(renderer.device, &layout_info, NULL, &pipeline_layout.layout);
     if(layout_result != VK_SUCCESS){
@@ -710,12 +818,13 @@ void wlCreateRasterizedRenderPipelineLayout(){
         return;
     }
 
-    renderer.pipeline_layout = pipeline_layout;
+    renderer.basic_pipeline_layout = pipeline_layout;
 
-    WL_LOG(WL_LOG_FATAL, "pipeline layout created successfully!");
+    WL_LOG(WL_LOG_TRACE, "pipeline layout created successfully!");
+
 }
 void wlDestroyRasterizedRenderPipelineLayout(){
-    vkDestroyPipelineLayout(renderer.device ,renderer.pipeline_layout.layout, NULL);
+    vkDestroyPipelineLayout(renderer.device ,renderer.basic_pipeline_layout.layout, NULL);
 }
 
 void wlCreateBasicPipeLine(){
@@ -733,7 +842,7 @@ void wlCreateBasicPipeLine(){
     VkShaderModule fragment_shader_module;
 
     //vertex shader
-    VkShaderModuleCreateInfo vertex_shader_create_info{};
+    VkShaderModuleCreateInfo vertex_shader_create_info = {};
     vertex_shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     vertex_shader_create_info.codeSize = vertex_code_size;
     vertex_shader_create_info.pCode = (const uint32_t*)(vertex_shader_code);
@@ -748,7 +857,7 @@ void wlCreateBasicPipeLine(){
     WL_LOG(WL_LOG_TRACE, "vertex shader created successfully!");
 
     //fragment shader
-    VkShaderModuleCreateInfo fragment_shader_create_info{};
+    VkShaderModuleCreateInfo fragment_shader_create_info = {};
     fragment_shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     fragment_shader_create_info.codeSize = fragment_code_size;
     fragment_shader_create_info.pCode = (const uint32_t*)(fragment_shader_code);
@@ -762,12 +871,12 @@ void wlCreateBasicPipeLine(){
     }
     WL_LOG(WL_LOG_TRACE, "fragment shader created successfully!");
 
-    VkPipelineShaderStageCreateInfo vertex_shader_stage_info{};
+    VkPipelineShaderStageCreateInfo vertex_shader_stage_info = {};
     vertex_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertex_shader_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
     vertex_shader_stage_info.module = vertex_shader_module;
     vertex_shader_stage_info.pName = "main";
-    VkPipelineShaderStageCreateInfo fragment_shader_stage_info{};
+    VkPipelineShaderStageCreateInfo fragment_shader_stage_info = {};
     fragment_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragment_shader_stage_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     fragment_shader_stage_info.module = fragment_shader_module;
@@ -777,8 +886,24 @@ void wlCreateBasicPipeLine(){
  /////////////////////////////////////////////////////////////////////
             //      fixed piplestage settings       //
 
+    
+    VkDynamicState pDynamic_states[] = {
+	    VK_DYNAMIC_STATE_VIEWPORT,
+	    VK_DYNAMIC_STATE_SCISSOR
+    };
+    VkPipelineDynamicStateCreateInfo dynamic_state_info = {};
+    dynamic_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamic_state_info.dynamicStateCount = SIZE_OF_ARRAY(pDynamic_states);
+    dynamic_state_info.pDynamicStates = pDynamic_states;
+
+    VkPipelineViewportStateCreateInfo view_port_info = {};
+    view_port_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    view_port_info.viewportCount = 1;
+    view_port_info.scissorCount = 1;
+
+
     // Anti Aliassing
-    VkPipelineMultisampleStateCreateInfo multi_sampling_info{};
+    VkPipelineMultisampleStateCreateInfo multi_sampling_info = {};
     multi_sampling_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multi_sampling_info.sampleShadingEnable = VK_FALSE;
     multi_sampling_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -826,25 +951,51 @@ void wlCreateBasicPipeLine(){
  /////////////////////////////////////////////////////////////////////
              //       creating the pipeline        //
 
-    VkGraphicsPipelineCreateInfo pipeline_info;
+    // input structure
+
+    VkPipelineVertexInputStateCreateInfo vertex_input_state_info = {};
+    vertex_input_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+    vertex_input_state_info.vertexAttributeDescriptionCount = WL_VERTEX_ATTRIBUTE_COUNT;
+    vertex_input_state_info.pVertexAttributeDescriptions = WL_VERTEX_INFO.pAttribute_descriptions;
+
+    vertex_input_state_info.vertexBindingDescriptionCount = 1;
+    vertex_input_state_info.pVertexBindingDescriptions = &WL_VERTEX_INFO.bind_description;
+
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {};
+    input_assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    input_assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;	// 0,1,2 is a trianlge, 3,4,5 is another triangle, 6,7,8 is another triangle
+    input_assembly_info.primitiveRestartEnable = VK_FALSE;	
+    
+    // PIPELINE CREATION
+
+    VkGraphicsPipelineCreateInfo pipeline_info = {};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline_info.stageCount = SIZE_OF_ARRAY(shader_stages);
     pipeline_info.pStages = shader_stages;
-    pipeline_info.pVertexInputState = &vertexInputInfo;
-    pipeline_info.pInputAssemblyState = &inputAssemblyInfo;
-    pipeline_info.pViewportState = &viewPortInfo;
+    pipeline_info.pVertexInputState = &vertex_input_state_info;
+    pipeline_info.pInputAssemblyState = &input_assembly_info;
+    pipeline_info.pViewportState = &view_port_info;
     pipeline_info.pRasterizationState = &rasterization_state_info;
     pipeline_info.pMultisampleState = &multi_sampling_info;
     pipeline_info.pDepthStencilState = NULL;
     pipeline_info.pColorBlendState = &color_blending_info;
-    pipeline_info.pDynamicState = &dynamicStateInfo;
-    pipeline_info.layout = renderer.pipeline_layout.layout;
-    pipeline_info.renderPass;
+    pipeline_info.pDynamicState = &dynamic_state_info;
+    pipeline_info.layout = renderer.basic_pipeline_layout.layout;
+    pipeline_info.renderPass = renderer.basic_pipeline_layout.render_pass;
     pipeline_info.subpass = 0;
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE; // Optional
     pipeline_info.basePipelineIndex = -1; // Optional
 
-    vkCreateGraphicsPipelines(renderer.device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline.pipeline);
+
+    WL_LOG(WL_LOG_TRACE, "creating simple graphics pipeline ...");
+    VkResult layout_result;
+    layout_result = vkCreateGraphicsPipelines(renderer.device, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline.pipeline);;
+    if(layout_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create simple graphics pipeline");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "simple graphics pipeline created successfully!");
 
     renderer.simple_graphics_pipeline = pipeline;
 }

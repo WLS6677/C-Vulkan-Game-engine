@@ -2,14 +2,14 @@ glfwWindow >/
 
 vulkan instance >/
 debugger validation layer >/
-swapchain
+swapchain >/
 phyiscal device >/
 logical device >/
 
 pipelinelayout >/
-renderpass
+renderpass >/
 shaders
-pipeline
+pipeline >/
 command buffer
 render function that does a render pass with command bufffers and intakes render objects
 
@@ -43,6 +43,7 @@ make some FL studio music
         // code copy + paste //
 //////////////////////////////////////////
 
+
 WL_LOG(WL_LOG_TRACE, "creating  ...");
     VkResult layout_result;
     layout_result = ;
@@ -51,6 +52,11 @@ WL_LOG(WL_LOG_TRACE, "creating  ...");
         return;
     }
 WL_LOG(WL_LOG_TRACE, " created successfully!");
+
+
+    #ifdef WL_DEBUG
+    printf("\n");
+    #endif
 
 
 
