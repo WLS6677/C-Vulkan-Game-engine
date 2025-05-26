@@ -11,10 +11,12 @@ renderpass >/
 shaders >/
 pipeline >/
 vertex buffer assembler >/
-rendering command buffer
-render function that does a render pass with command bufffers
+rendering command buffer >/
+render function that does a render pass with command bufffers >/
 
-render our first triangle
+render our first triangle >/
+
+make uniforms with their descriptor sets to have a camera view
 
 make an SVO >/
 SVO sample function based generation >/
