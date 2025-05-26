@@ -130,11 +130,7 @@ WLEngine* wlCreateEngine(){
         wlReleaseAlloc();
         return NULL;
     }
-
-    wlCreateRasterizedRenderPipelineLayout();
-
     return engine;
-
 }
 void wlDestroyEngine(WLEngine* engine){
     wlDestroyRenderer();

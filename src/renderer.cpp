@@ -78,7 +78,6 @@ typedef struct WLRenderPipelineLayout{
     void** ppUniformBuffersMapped;
 } WLRenderPipelineLayout;
 typedef struct {
-    
     VkVertexInputBindingDescription bind_description;
     VkVertexInputAttributeDescription pAttribute_descriptions[WL_VERTEX_ATTRIBUTE_COUNT];
 } WLVertexInfo;
