@@ -5,6 +5,7 @@
 
 #define WL_VERTEX_ATTRIBUTE_COUNT 2
 #define GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES (1024*1024*8)
+#define MAX_FRAMES_IN_FLIGHT 3 // max number of frames that can be proccessed by the GPU at the same time
 
 #define WL_DEBUG
 
@@ -103,35 +104,50 @@ static const WLVertexInfo WL_VERTEX_INFO = {
 };
 typedef struct WLGPUVertexBuffer {
     VkBuffer buffer;
-    uint32_t vertex_count;
     VkDeviceMemory memory;
+    uint32_t max_vertex_count;
+    uint32_t total_vertex_Count;
 } WLGPUVertexBuffer;
 
 struct WLRenderer{
 
+    // vulkan
     VkInstance vulkan_instance;
     VkPhysicalDevice physical_device;
     VkDevice device;
     VkDebugUtilsMessengerEXT debug_messenger;
+
     // SwapChain
     VkSurfaceKHR surface;
     WLSwapChain swap_chain;
+
     // queueueueueueueueueueueueueueues
     VkQueue graphics_queue;
     VkQueue present_queue;
     VkQueue compute_queue;
     VkQueue transfer_queue;
 
+    // command buffers
     VkCommandPool graphics_command_pool;
     VkCommandPool transfer_command_pool;
+    // pools
     VkCommandBuffer* pGraphics_command_buffers;
     VkCommandBuffer transfer_command_buffer;
+    
 
     // pipelines
     WLRenderPipelineLayout basic_pipeline_layout;
     bool pipeline_layout_exists;
     WLPipeline simple_graphics_pipeline;
     WLGPUVertexBuffer vertex_buffer;
+
+    // sync objects
+    VkSemaphore pImage_available_semaphores[MAX_FRAMES_IN_FLIGHT];
+    VkSemaphore pRender_finished_semaphores[MAX_FRAMES_IN_FLIGHT];
+    VkFence pIn_flight_fence[MAX_FRAMES_IN_FLIGHT];
+
+    uint32_t frames_in_flight; // number of frames which are being proccessed by the GPU at a set time
+    uint32_t current_flight_frame_index; // from 0 to MAXFRAMEINFLIGHT, cycles through frames for command buffer writing
 };
 
 static WLRenderer renderer = {};
@@ -529,6 +545,50 @@ void wlCreateRenderer(void* window_handle){
     wlCreateSwapChain(window_handle);
     wlCreateRasterizedRenderPipelineLayout();
     wlCreateBasicPipeLine();
+    wlCreateCommandBuffers();
+    wlCreateFrameBuffers();
+
+ ////////////////////////////////////////////////
+        //      sync objects        //      
+
+    // semaphores
+    VkSemaphoreCreateInfo semaphore_info = {};
+    semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    WL_LOG(WL_LOG_TRACE, "creating semaphores ...");
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
+        
+        VkResult semaphore_result;
+        semaphore_result = vkCreateSemaphore(renderer.device, &semaphore_info, NULL, &renderer.pImage_available_semaphores[i]);
+        if(semaphore_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create a semaphore");
+        wlDestroyRenderer();
+        return;
+        }
+        semaphore_result = vkCreateSemaphore(renderer.device, &semaphore_info, NULL, &renderer.pRender_finished_semaphores[i]);
+        if(semaphore_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create a semaphore");
+        wlDestroyRenderer();
+        return;
+        }
+    }
+    WL_LOG(WL_LOG_TRACE, "semaphores created successfully!");
+
+    // fences
+    VkFenceCreateInfo fence_info = {};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
+        WL_LOG(WL_LOG_TRACE, "creating fences ...");
+        VkResult layout_result;
+        layout_result = vkCreateFence(renderer.device, &fence_info, NULL, &renderer.pIn_flight_fence[i]);
+        if(layout_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create a fence");
+        return;
+        }
+        WL_LOG(WL_LOG_TRACE, "fences created successfully!");
+    }
 
     return;
 }
@@ -688,37 +748,8 @@ void wlCreateSwapChain(void* window_handle){
  //////////////////////////////////////////////////////////
             //      swapchain buffers      //
 
-    if(!renderer.pipeline_layout_exists){
-        WL_LOG(WL_LOG_WARNING, "render layout not created, no frame buffers for you");
+
         renderer.swap_chain = swapchain;
-        return;
-    }
-
-    WL_LOG(WL_LOG_TRACE, "creating swap chain buffers ...");
-
-    swapchain.pFramebuffers = (VkFramebuffer*)wlAlloc(swapchain.image_count*sizeof(VkFramebuffer));
-    for (size_t i = 0; i < swapchain.image_count; i++){
-        VkImageView attachments[] = {
-	        swapchain.pImage_views[i]
-	        // other attachments
-        };
-
-        VkFramebufferCreateInfo framebuffer_info = {};
-        framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebuffer_info.renderPass = renderer.basic_pipeline_layout.render_pass;
-        framebuffer_info.height = swapchain.extent.height;
-        framebuffer_info.width = swapchain.extent.width;
-        framebuffer_info.attachmentCount = SIZE_OF_ARRAY(attachments);
-        framebuffer_info.pAttachments = attachments;
-        framebuffer_info.layers = 1;
-
-        VkResult frame_buffer_result;
-        frame_buffer_result = vkCreateFramebuffer(renderer.device, &framebuffer_info, nullptr, &swapchain.pFramebuffers[i]);
-        if(frame_buffer_result != VK_SUCCESS){
-        WL_LOG(WL_LOG_FATAL, "failed to create frame buffer");
-        return;
-        }
-    }
 }
 void wlReCreateSwapChain(void* window_handle);
 void wlDestroySwapChain();
@@ -920,7 +951,7 @@ void wlCreateBasicPipeLine(){
 
     VkPipelineColorBlendAttachmentState color_blend_attachment = {};
     color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    color_blend_attachment.blendEnable = VK_TRUE;
+    color_blend_attachment.blendEnable = VK_FALSE;
     color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
@@ -1005,7 +1036,7 @@ void wlCreateCommandBuffers(){
     VkCommandPoolCreateInfo graphics_pool_info = {};
     graphics_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     graphics_pool_info.queueFamilyIndex = family_indices.graphics_family;
-    graphics_pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    graphics_pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     WL_LOG(WL_LOG_TRACE, "creating graphics pool ...");
     VkResult graphics_pool_result;
@@ -1019,7 +1050,7 @@ void wlCreateCommandBuffers(){
     VkCommandPoolCreateInfo transfer_pool_info = {};
     transfer_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     transfer_pool_info.queueFamilyIndex = family_indices.graphics_family;
-    transfer_pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    transfer_pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     WL_LOG(WL_LOG_TRACE, "creating transfer pool ...");
     VkResult transfer_pool_result;
@@ -1076,7 +1107,119 @@ void wlDestroyCommandBuffers(){
 
 }
 
+void wlCreateFrameBuffers(){
+    WL_LOG(WL_LOG_TRACE, "creating swap chain buffers ...");
+
+    renderer.swap_chain.pFramebuffers = (VkFramebuffer*)wlAlloc(renderer.swap_chain.image_count*sizeof(VkFramebuffer));
+    for (size_t i = 0; i < renderer.swap_chain.image_count; i++){
+        VkImageView attachments[] = {
+	        renderer.swap_chain.pImage_views[i]
+	        // other attachments
+        };
+
+        VkFramebufferCreateInfo framebuffer_info = {};
+        framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_info.renderPass = renderer.basic_pipeline_layout.render_pass;
+        framebuffer_info.height = renderer.swap_chain.extent.height;
+        framebuffer_info.width = renderer.swap_chain.extent.width;
+        framebuffer_info.attachmentCount = SIZE_OF_ARRAY(attachments);
+        framebuffer_info.pAttachments = attachments;
+        framebuffer_info.layers = 1;
+
+        VkResult frame_buffer_result;
+        frame_buffer_result = vkCreateFramebuffer(renderer.device, &framebuffer_info, nullptr, &renderer.swap_chain.pFramebuffers[i]);
+        if(frame_buffer_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create frame buffer");
+        return;
+        }
+    }
+
+    WL_LOG(WL_LOG_TRACE, "swap chain buffers created successfully ...");
+}
+void wlRender(){
+
+    // frames are in the context of processing, we know the order of
+    // images are in the context of the swapchain, its random access from our POV;
+
+    vkWaitForFences(renderer.device, 1, &renderer.pIn_flight_fence[renderer.current_flight_frame_index], 1, UINT64_MAX);
+
+    vkResetFences(renderer.device, 1, &renderer.pIn_flight_fence[renderer.current_flight_frame_index]);
+
+    uint32_t next_image_index;
+    vkAcquireNextImageKHR(renderer.device, renderer.swap_chain.swapchain, UINT64_MAX, renderer.pImage_available_semaphores[renderer.current_flight_frame_index], VK_NULL_HANDLE, &next_image_index);
+
+    VkCommandBufferBeginInfo command_begin_info = {};
+    command_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    // drawing commands
+    vkResetCommandBuffer(renderer.pGraphics_command_buffers[next_image_index], 0);
+    vkBeginCommandBuffer(renderer.pGraphics_command_buffers[next_image_index], &command_begin_info);
+
+    VkClearValue clear_color = {0.1f,0.1f,0.1f,1.0f};
+    VkRect2D render_area;
+    render_area.offset.x = 0;
+    render_area.offset.y = 0;
+    render_area.extent.width = renderer.swap_chain.extent.width; 
+    render_area.extent.height = renderer.swap_chain.extent.height;
+
+    VkRenderPassBeginInfo pass_begind_info = {};
+    pass_begind_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    pass_begind_info.renderPass = renderer.basic_pipeline_layout.render_pass;
+    pass_begind_info.framebuffer = renderer.swap_chain.pFramebuffers[next_image_index]; // the frame the render pass will draw to
+    pass_begind_info.clearValueCount = 1;
+    pass_begind_info.pClearValues = &clear_color;
+    pass_begind_info.renderArea = render_area;
+    vkCmdBeginRenderPass(renderer.pGraphics_command_buffers[next_image_index], &pass_begind_info, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(renderer.pGraphics_command_buffers[next_image_index], VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.simple_graphics_pipeline.pipeline);
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(renderer.pGraphics_command_buffers[next_image_index], 0, 1, &renderer.vertex_buffer.buffer, offsets);
+
+    VkViewport pViewports = {};
+    pViewports.x = 0.0f;
+    pViewports.y = 0.0f;
+    pViewports.width = (float)renderer.swap_chain.extent.width;
+    pViewports.height = (float)renderer.swap_chain.extent.height;
+    pViewports.minDepth = 0.0f;
+    pViewports.maxDepth = 1.0f;
+    vkCmdSetViewport(renderer.pGraphics_command_buffers[next_image_index], 0, 1, &pViewports);
+    vkCmdSetScissor(renderer.pGraphics_command_buffers[next_image_index], 0, 1, &render_area);
+
+    vkCmdDraw(renderer.pGraphics_command_buffers[next_image_index], renderer.vertex_buffer.total_vertex_Count, 1, 0, 0);
+
+    vkCmdEndRenderPass(renderer.pGraphics_command_buffers[next_image_index]);
+    vkEndCommandBuffer(renderer.pGraphics_command_buffers[next_image_index]);
+
+    //submitting draw commands
+    VkPipelineStageFlags pWait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = &renderer.pImage_available_semaphores[renderer.current_flight_frame_index]; // waits for image to be ready
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = &renderer.pRender_finished_semaphores[renderer.current_flight_frame_index];// signals when rendering is done
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &renderer.pGraphics_command_buffers[next_image_index]; 
+    submit_info.pWaitDstStageMask = pWait_stages;
+
+    vkQueueSubmit(renderer.graphics_queue, 1, &submit_info, renderer.pIn_flight_fence[renderer.current_flight_frame_index]);
+
+    VkPresentInfoKHR present_info = {};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = &renderer.pRender_finished_semaphores[renderer.current_flight_frame_index];
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = &renderer.swap_chain.swapchain;
+    present_info.pImageIndices = &next_image_index;
+
+    vkQueuePresentKHR(renderer.present_queue, &present_info);
+
+    renderer.current_flight_frame_index = (renderer.current_flight_frame_index + 1) % MAX_FRAMES_IN_FLIGHT;
+}
 void wlDestroyRenderer(){
+    vkFreeMemory(renderer.device, renderer.vertex_buffer.memory, NULL);
+    vkDestroyBuffer(renderer.device, renderer.vertex_buffer.buffer, NULL);
     wlDestroyRasterizedRenderPipelineLayout();
     vkDestroyDevice(renderer.device, NULL);
     vkDestroySurfaceKHR(renderer.vulkan_instance, renderer.surface, NULL);
@@ -1115,7 +1258,7 @@ uint32_t get_required_memory_index(VkMemoryRequirements requirements, uint32_t d
 
     return UINT32_MAX;
 }
-void initVertexBuffer(WLRenderObject* pObjects, uint32_t object_count){
+void wlInitVertexBuffer(const WLRenderObject* pObjects,const uint32_t object_count){
 
     // holds the index of the next free index in the main buffer using bytes
     static uint32_t next_free_byte_offset_counter = 0;
@@ -1137,6 +1280,7 @@ void initVertexBuffer(WLRenderObject* pObjects, uint32_t object_count){
             return;
             //TODO: make it ignore the extra vertices safely instead of fully crash
         }
+        renderer.vertex_buffer.max_vertex_count = max_vertex_count;
 
         memcpy(main_buffer + next_free_byte_offset_counter, pObjects[i].pVertex_buffer, vertex_count*sizeof(WLVertex));
         pObjects_data[total_object_count].vertex_count = vertex_count;
@@ -1147,6 +1291,8 @@ void initVertexBuffer(WLRenderObject* pObjects, uint32_t object_count){
         total_object_count++;
     }
 
+    renderer.vertex_buffer.total_vertex_Count = total_vertex_count;
+
     //TODO: make a dynamic version of this for updating chunks
 
  /////////////////////////////////////////////////////////
@@ -1156,7 +1302,7 @@ void initVertexBuffer(WLRenderObject* pObjects, uint32_t object_count){
     VkBufferCreateInfo vert_buffer_info = {};
     vert_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     vert_buffer_info.size = GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES;
-    vert_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    vert_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     vert_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     WL_LOG(WL_LOG_TRACE, "creating vertex buffer ...");
@@ -1176,6 +1322,7 @@ void initVertexBuffer(WLRenderObject* pObjects, uint32_t object_count){
     vert_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     vert_alloc_info.allocationSize = vert_memory_requirements.size;
     vert_alloc_info.memoryTypeIndex = get_required_memory_index(vert_memory_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vert_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
     WL_LOG(WL_LOG_TRACE, "allocating vertex buffer memory ...");
     VkResult vert_aloc_result;

@@ -23,5 +23,9 @@ void wlDestroyRenderer();
 void wlCreateSwapChain(void* window_handle);
 void wlCreateRasterizedRenderPipelineLayout();
 void wlCreateBasicPipeLine();
+void wlCreateCommandBuffers();
+void wlCreateFrameBuffers();
+
+void wlInitVertexBuffer(const WLRenderObject* pObjects, const uint32_t object_count);
 
 #endif

@@ -130,16 +130,45 @@ WLEngine* wlCreateEngine(){
         wlReleaseAlloc();
         return NULL;
     }
+
+    WLRenderObject HELLO_TRIANGLE = {};
+
+    WLVertex HELLO_VERTEX[] = {
+        {{0.5f,0.0f,0.0f},{1.0f,0.0f,0.0f}},
+        {{-0.5f,0.0f,0.0f},{0.0f,1.0f,0.0f}},
+        {{0.0f,0.5f,0.0f},{0.0f,0.0f,1.0f}},
+
+        {{0.5f,0.5f,0.0f},{1.0f,0.0f,0.0f}},
+        {{-0.5f,0.0f,0.0f},{0.0f,1.0f,0.0f}},
+        {{0.0f,0.5f,0.0f},{0.0f,0.0f,1.0f}},
+
+        {{-0.5f,0.0f,0.0f},{1.0f,0.0f,0.0f}},
+        {{0.5f,0.0f,0.0f},{0.0f,1.0f,0.0f}},
+        {{0.0f,-0.5f,0.0f},{0.0f,0.0f,1.0f}},
+
+        {{0.0f,-0.5f,0.0f},{1.0f,0.0f,0.0f}},
+        {{0.5f,0.5f,0.0f},{0.0f,1.0f,0.0f}},
+        {{-0.5f,0.5f,0.0f},{0.0f,0.0f,1.0f}}
+    };
+
+    HELLO_TRIANGLE.pVertex_buffer = HELLO_VERTEX;
+    HELLO_TRIANGLE.vertex_count = 12;
+
+    wlInitVertexBuffer(&HELLO_TRIANGLE, 1);
+
+
+
     return engine;
 }
 void wlDestroyEngine(WLEngine* engine){
-    wlDestroyRenderer();
     wlDestroyWindow(engine->pWindow);
+    wlDestroyRenderer();
     wlReleaseAlloc();
 }
 void wlRunEngine(WLEngine* engine){
     while(!wlWindowShouldClose(engine->pWindow)){
         wlUpdateWindow(engine->pWindow);
+        wlRender();
     }
     printf("shutting down...");
 }

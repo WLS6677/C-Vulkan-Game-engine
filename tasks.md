@@ -11,8 +11,8 @@ renderpass >/
 shaders >/
 pipeline >/
 vertex buffer assembler >/
- rendering command buffer
-render function that does a render pass with command bufffers and intakes render objects
+rendering command buffer
+render function that does a render pass with command bufffers
 
 render our first triangle
 
