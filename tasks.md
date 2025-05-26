@@ -35,6 +35,14 @@ make some FL studio music
 
 
 
+
+
+
+
+///////////////////////////////////////////////////////////
+        // code copy + paste //
+//////////////////////////////////////////
+
 WL_LOG(WL_LOG_TRACE, "creating  ...");
     VkResult layout_result;
     layout_result = ;
@@ -43,6 +51,12 @@ WL_LOG(WL_LOG_TRACE, "creating  ...");
         return;
     }
 WL_LOG(WL_LOG_TRACE, " created successfully!");
+
+
+
+for (size_t i = 0; i < ; i++){
+        
+}
 
 
 

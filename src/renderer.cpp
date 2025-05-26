@@ -4,18 +4,17 @@
 
 struct WLSwapChain{
     VkSwapchainKHR swapchain;
+
+    uint32_t image_count;
+    // all of these arrays are size(image_count)
+    VkImage* pImages;
+    VkImageView* pImage_views;
+    VkFramebuffer* pFramebuffers;
     
-    VkImage* pSwapchain_images;
-    uint32_t swapChain_image_count;
 
-    VkFormat swapChain_image_Format;
-    VkExtent2D swapChain_extent;
-
-    VkImageView* pSwapChain_image_views;
-    uint32_t swapChain_image_view_count;
-
-    VkFramebuffer* swapChain_framebuffers;
-    uint32_t swapChain_framebuffer_count;
+    VkSurfaceFormatKHR surface_format;
+    VkPresentModeKHR present_mode;
+    VkExtent2D extent;
 
     VkBuffer staging_buffer;
     VkDeviceMemory staging_buffer_memory;
@@ -115,8 +114,10 @@ typedef struct WLQueueFamilyIndices{
 } WLQueueFamilyIndices;
 typedef struct WLSwapChainSupportDetails{
     VkSurfaceCapabilitiesKHR capabilities;
-    VkSurfaceFormatKHR* formats;
-    VkPresentModeKHR* present_modes;
+    VkSurfaceFormatKHR* pFormats;
+    uint32_t format_count;
+    VkPresentModeKHR* pPresent_modes;
+    uint32_t present_mode_count;
 } WLSwapChainSupportDetails;
 
 //the functions needed for creating the VkInstance
@@ -200,19 +201,17 @@ WLSwapChainSupportDetails query_swap_chain_support_details(VkPhysicalDevice devi
     
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
 
-    uint32_t format_count = 0;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, NULL);
-    details.formats = (VkSurfaceFormatKHR*)wlAlloc(format_count*sizeof(VkSurfaceFormatKHR));
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, details.formats);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &details.format_count, NULL);
+    details.pFormats = (VkSurfaceFormatKHR*)wlAlloc(details.format_count*sizeof(VkSurfaceFormatKHR));
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &details.format_count, details.pFormats);
 
-    uint32_t present_count = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_count, NULL);
-    details.present_modes = (VkPresentModeKHR*)wlAlloc(present_count*sizeof(VkPresentModeKHR));
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_count, details.present_modes);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &details.present_mode_count, NULL);
+    details.pPresent_modes = (VkPresentModeKHR*)wlAlloc(details.present_mode_count*sizeof(VkPresentModeKHR));
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &details.present_mode_count, details.pPresent_modes);
     
 
     #ifdef WL_DEBUG 
-    printf("avaialable format count: %u     available present count:%u\n",format_count ,present_count);
+    pmode_rintf("avaialable format count: %u     available present count:%u\n",format_count ,details.present_mode_count);
     #endif
 
     return details;
@@ -242,7 +241,7 @@ bool is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface){
 
     //checking for swapchain support
     WLSwapChainSupportDetails swapchain_details = query_swap_chain_support_details(device, surface);
-    if(swapchain_details.formats==NULL || swapchain_details.present_modes==NULL){
+    if(swapchain_details.pFormats==NULL || swapchain_details.pPresent_modes==NULL){
         WL_LOG(WL_LOG_WARNING, "GPU doesnt support swapcahin present formats or mods");
         return false;
     }
@@ -498,6 +497,171 @@ void wlCreateRenderer(void* window_handle){
     return;
 }
 
+void wlCreateSwapChain(void* window_handle){
+
+    WLSwapChain swapchain;
+    
+ ///////////////////////////////////////////////////
+            //      swapchain       //
+
+    WLSwapChainSupportDetails swapchain_support = query_swap_chain_support_details(renderer.physical_device, renderer.surface);
+
+    // choosing surface format
+    VkSurfaceFormatKHR surface_format = {};
+    for (size_t i = 0; i < swapchain_support.format_count; i++)
+    {
+        if(
+            swapchain_support.pFormats[i].format == VK_FORMAT_B8G8R8A8_SRGB &&
+            swapchain_support.pFormats[i].colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR
+        ){
+            surface_format = swapchain_support.pFormats[i];
+        }
+    }
+    swapchain.surface_format = surface_format;
+
+    // choosing present mode
+    VkPresentModeKHR present_mode = {};
+    for (size_t i = 0; i < swapchain_support.present_mode_count; i++){
+        if(
+            swapchain_support.pPresent_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR
+        ){
+            present_mode = swapchain_support.pPresent_modes[i];
+        }
+    }
+    if(present_mode != VK_PRESENT_MODE_MAILBOX_KHR){
+        present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    }
+    swapchain.present_mode = present_mode;
+
+    // getting image extent
+    VkExtent2D extent;
+    if(swapchain_support.capabilities.currentExtent.width != UINT32_MAX){
+        extent = swapchain_support.capabilities.currentExtent;
+    } else{
+        int extent_width, extent_height;
+        glfwGetFramebufferSize((GLFWwindow*)window_handle, &extent_width, &extent_height);
+
+        VkExtent2D new_extent = {
+            (uint32_t)extent_width,
+            (uint32_t)extent_height
+        };
+
+        //TODO: clamp the width and height to the capablity max and min
+
+        extent = new_extent;
+    }
+    swapchain.extent = extent;
+    
+    swapchain.image_count = swapchain_support.capabilities.minImageCount + 1;
+    // check if we exceeded the max image limit
+    if (swapchain_support.capabilities.maxImageCount > 0 && swapchain.image_count > swapchain_support.capabilities.maxImageCount) {
+	    swapchain.image_count = swapchain_support.capabilities.maxImageCount;
+    }
+    
+    VkSwapchainCreateInfoKHR swapchain_info = {};
+    swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    swapchain_info.surface = renderer.surface;
+    swapchain_info.minImageCount = swapchain.image_count;
+    swapchain_info.imageArrayLayers = 1;
+    swapchain_info.imageFormat = swapchain.surface_format.format;
+    swapchain_info.imageColorSpace = swapchain.surface_format.colorSpace;
+    swapchain_info.imageExtent = swapchain.extent;
+    swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    WLQueueFamilyIndices family_indices = find_queue_families(renderer.physical_device, renderer.surface);
+    uint32_t queue_family_indecies[] = { family_indices.graphics_family, family_indices.present_family };
+
+    if (family_indices.graphics_family != family_indices.present_family) {
+	swapchain_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+	swapchain_info.queueFamilyIndexCount = 2;
+	swapchain_info.pQueueFamilyIndices = queue_family_indecies;
+    } else{
+	swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	swapchain_info.queueFamilyIndexCount = 0;
+	swapchain_info.pQueueFamilyIndices = NULL;
+    }
+
+    swapchain_info.preTransform = swapchain_support.capabilities.currentTransform;
+    swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+
+    swapchain_info.presentMode = swapchain.present_mode;
+    swapchain_info.clipped = VK_TRUE;
+
+    swapchain_info.oldSwapchain = VK_NULL_HANDLE;
+
+    WL_LOG(WL_LOG_TRACE, "creating swapchain ...");
+    VkResult swapchain_result;
+    swapchain_result = vkCreateSwapchainKHR(renderer.device, &swapchain_info, NULL, &swapchain.swapchain);
+    if(swapchain_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create swapchain");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "swapchain created successfully!");
+
+    // getting the image handles.
+    vkGetSwapchainImagesKHR(renderer.device, swapchain.swapchain, &swapchain.image_count, NULL);
+    swapchain.pImages = (VkImage*)wlAlloc(sizeof(VkImage) * swapchain.image_count);
+    vkGetSwapchainImagesKHR(renderer.device, swapchain.swapchain, &swapchain.image_count, swapchain.pImages);
+
+ //////////////////////////////////////////////////////////
+            //      swapchain image views      //
+
+    swapchain.pImage_views = (VkImageView*)wlAlloc(swapchain.image_count*sizeof(VkImageView));
+    for (size_t i = 0; i < swapchain.image_count; i++){
+        VkImageViewCreateInfo image_view_info = {};
+        image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        image_view_info.image = swapchain.pImages[i];
+
+        image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        image_view_info.format = swapchain.surface_format.format;
+
+        image_view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        image_view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        image_view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        image_view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+        image_view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        image_view_info.subresourceRange.baseArrayLayer = 0;
+        image_view_info.subresourceRange.baseMipLevel = 0;
+        image_view_info.subresourceRange.layerCount = 1;
+        image_view_info.subresourceRange.levelCount = 1;
+
+        
+        
+        //WL_LOG(WL_LOG_TRACE, "creating image view ...");  
+        VkResult image_view_result;
+        image_view_result = vkCreateImageView(renderer.device, &image_view_info, nullptr, &swapchain.pImage_views[i]);
+        if(image_view_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create image view");
+        return;
+        }
+        //WL_LOG(WL_LOG_TRACE, "image view created successfully!");
+    }
+    
+ //////////////////////////////////////////////////////////
+            //      swapchain buffers      //
+
+    swapchain.pFramebuffers = (VkFramebuffer*)wlAlloc(swapchain.image_count*sizeof(VkFramebuffer));
+    for (size_t i = 0; i < swapchain.image_count; i++){
+        VkImageView attachments[] = {
+	    swapchain.pImage_views[i];
+	    // other attachments
+        };
+
+        VkFramebufferCreateInfo framebuffer_info = {};
+        framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_info.renderPass = renderPass;
+        framebuffer_info.height = swapChainExtent.height;
+        framebuffer_info.width = swapChainExtent.width;
+        framebuffer_info.attachmentCount = 1;
+        framebuffer_info.pAttachments = attachments;
+        framebuffer_info.layers = 1;
+
+    vkCreateFramebuffer(device, &framebuffer_info, nullptr, &swapChainFramebuffers[i])
+
+    }
+}
+
 void wlCreateRasterizedRenderPipelineLayout(){
     WLPipelineLayout pipeline_layout;
 
@@ -576,7 +740,7 @@ void wlCreateBasicPipeLine(){
 
     WL_LOG(WL_LOG_TRACE, "creating vertex shader ...");
     VkResult vertex_result;
-    vertex_result = vkCreateShaderModule(renderer.device, &vertex_shader_create_info, nullptr, &vertex_shader_module);
+    vertex_result = vkCreateShaderModule(renderer.device, &vertex_shader_create_info, NULL, &vertex_shader_module);
     if(vertex_result != VK_SUCCESS){
         WL_LOG(WL_LOG_FATAL, "failed to create vertex shader");
         return;
@@ -591,7 +755,7 @@ void wlCreateBasicPipeLine(){
 
     WL_LOG(WL_LOG_TRACE, "creating fragment shader ...");
     VkResult fragment_result;
-    fragment_result = vkCreateShaderModule(renderer.device, &fragment_shader_create_info, nullptr, &fragment_shader_module);
+    fragment_result = vkCreateShaderModule(renderer.device, &fragment_shader_create_info, NULL, &fragment_shader_module);
     if(fragment_result != VK_SUCCESS){
         WL_LOG(WL_LOG_FATAL, "failed to create fragment shader");
         return;
@@ -619,7 +783,7 @@ void wlCreateBasicPipeLine(){
     multi_sampling_info.sampleShadingEnable = VK_FALSE;
     multi_sampling_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     multi_sampling_info.minSampleShading = 1.0f; // Optional
-    multi_sampling_info.pSampleMask = nullptr; // Optional
+    multi_sampling_info.pSampleMask = NULL; // Optional
     multi_sampling_info.alphaToCoverageEnable = VK_FALSE; // Optional
     multi_sampling_info.alphaToOneEnable = VK_FALSE; // Optional
 
@@ -671,7 +835,7 @@ void wlCreateBasicPipeLine(){
     pipeline_info.pViewportState = &viewPortInfo;
     pipeline_info.pRasterizationState = &rasterization_state_info;
     pipeline_info.pMultisampleState = &multi_sampling_info;
-    pipeline_info.pDepthStencilState = nullptr;
+    pipeline_info.pDepthStencilState = NULL;
     pipeline_info.pColorBlendState = &color_blending_info;
     pipeline_info.pDynamicState = &dynamicStateInfo;
     pipeline_info.layout = renderer.pipeline_layout.layout;
