@@ -3,6 +3,11 @@
 #include <glfw3.h>
 #include <string.h>
 
+#define WL_VERTEX_ATTRIBUTE_COUNT 2
+#define GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES (1024*1024*8)
+
+#define WL_DEBUG
+
 struct WLSwapChain{
     VkSwapchainKHR swapchain;
 
@@ -32,14 +37,6 @@ struct WLSwapChain{
 
     uint32_t currentFrame;
 };
-
-typedef struct {
-    vec3f Pos, Color;
-} WLVertex;
-#define WL_VERTEX_ATTRIBUTE_COUNT 2
-#define GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES (1024*1024*8)
-
-#define WL_DEBUG
 
 typedef struct WLPipeline {
     VkPipeline pipeline;
@@ -109,12 +106,7 @@ typedef struct WLGPUVertexBuffer {
     uint32_t vertex_count;
     VkDeviceMemory memory;
 } WLGPUVertexBuffer;
-typedef struct WLRenderObject {
-    WLPipeline* pPipeline;
-    WLVertex* pVertex_buffer;
-    uint32_t vertex_count;
-    uint32_t unique_id;
-} WLRenderObject;
+
 struct WLRenderer{
 
     VkInstance vulkan_instance;
@@ -1101,6 +1093,7 @@ typedef struct wl_object_data {
 } wl_object_data;
 
 // this works only for one pipeline type for now
+// it puts the vcertices of the render objects into a vertex buffers that the shaders will use to render for the rest of the game
 uint32_t get_required_memory_index(VkMemoryRequirements requirements, uint32_t desired_properties_mask){
     VkPhysicalDeviceMemoryProperties properties;
     vkGetPhysicalDeviceMemoryProperties(renderer.physical_device, &properties);
