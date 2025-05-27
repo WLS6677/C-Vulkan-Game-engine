@@ -5,7 +5,7 @@
 #include <time.h>
 #include <wlmath.h>
 #include <stdlib.h>
-#include <SVO.h>
+#include <glm/mat4x4.hpp>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,10 +18,8 @@ extern "C" {
 #ifdef WL_MATH
 
 #define vec2u32 WLU32Vec2
-
-#ifndef vec3f
 #define vec3f WL32fVec3
-#endif
+
 
 #endif //WL_MATH
 
@@ -82,5 +80,8 @@ void wlRunEngine(WLEngine* engine);
 // these are the modules, i need to include them after the debugging defintions to prevent errors 
 #include <renderer.h>
 #include <window.h>
+#include <SVO.h>
+#include <chunk.h>
+#include <scene.h>
 
 #endif // #ifndef WL_CORE

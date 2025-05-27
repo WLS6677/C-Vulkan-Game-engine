@@ -7,8 +7,6 @@
 #define GPU_VERTEX_BUFFER_MAX_MEMORY_BYTES (1024*1024*8)
 #define MAX_FRAMES_IN_FLIGHT 3 // max number of frames that can be proccessed by the GPU at the same time
 
-#define WL_DEBUG
-
 struct WLSwapChain{
     VkSwapchainKHR swapchain;
 
@@ -66,14 +64,13 @@ typedef struct WLRenderPipelineLayout{
     WLPipeline* pPipelines;
     uint32_t pipeline_count;
 
-    VkDescriptorSetLayout* pDescriptor_set_layouts;
-    uint32_t descriptor_set_layout_count;
     VkDescriptorPool descriptor_pool;
-
+    VkDescriptorSetLayout camera_descriptor_set_layout;
+    VkDescriptorSet* pCamera_descriptor_sets; // count is MAX_FRAMES_IN_FLIGHT
+    
     //uniform buffers
-    VkBuffer* pUniform_buffers;
-    VkDeviceMemory* pUniform_buffers_memory; 
-    uint32_t uniform_buffer_count;
+    VkBuffer* pCamera_uniform_buffers;
+    VkDeviceMemory* pCamera_uniform_buffer_memories; 
 
     void** ppUniformBuffersMapped;
 } WLRenderPipelineLayout;
@@ -391,7 +388,7 @@ void wlCreateRenderer(void* window_handle){
         return;
     }
 
-/////////////////////////////////////////////////////
+ /////////////////////////////////////////////////////
     //      debug messenger     //
 
     #ifdef WL_DEBUG
@@ -407,7 +404,7 @@ void wlCreateRenderer(void* window_handle){
     WL_LOG(WL_LOG_TRACE,"debug messenger created successfully!");
     #endif //WL_DEBUG
 
-/////////////////////////////////////////////
+ /////////////////////////////////////////////
     //      creating surface        //
 
     WL_LOG(WL_LOG_TRACE, "creating surfaceKHR...");
@@ -425,7 +422,7 @@ void wlCreateRenderer(void* window_handle){
 
 
 
-/////////////////////////////////////////////////////  
+ /////////////////////////////////////////////////////  
     //      choosing the physicsal device   //
 
     WL_LOG(WL_LOG_TRACE,"gettings valid GPUs...");
@@ -457,7 +454,7 @@ void wlCreateRenderer(void* window_handle){
     }
     WL_LOG(WL_LOG_TRACE,"successfully! found a suitable GPU!");
 
-/////////////////////////////////////////////////////////////
+ /////////////////////////////////////////////////////////////
         //      creating logical device         //
 
     VkDeviceCreateInfo device_info = {};
@@ -516,7 +513,7 @@ void wlCreateRenderer(void* window_handle){
     device_info.pEnabledFeatures = &deviceFeatures;
 
     // device extensions
-    char* device_extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    const char* device_extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     device_info.enabledExtensionCount = SIZE_OF_ARRAY(device_extensions);
     device_info.ppEnabledExtensionNames = device_extensions;
 
@@ -547,6 +544,7 @@ void wlCreateRenderer(void* window_handle){
     wlCreateBasicPipeLine();
     wlCreateCommandBuffers();
     wlCreateFrameBuffers();
+    wlCreateUniformBuffers();
 
  ////////////////////////////////////////////////
         //      sync objects        //      
@@ -820,7 +818,70 @@ void wlCreateRasterizedRenderPipelineLayout(){
  ////////////////////////////////////////////////////////////
             //       descriptor sets      //
 
+    // descriptor set
+    VkDescriptorSetLayoutBinding ubo_layout_binding = {};
+    ubo_layout_binding.binding = 0;
+    ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubo_layout_binding.descriptorCount = 1;
+    ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    ubo_layout_binding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo descrptor_set_info = {};
+    descrptor_set_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descrptor_set_info.bindingCount = 1;
+    descrptor_set_info.pBindings = &ubo_layout_binding;
     
+    WL_LOG(WL_LOG_TRACE, "creating descriptor set layout ...");
+    VkResult descriptor_layout_result;
+    descriptor_layout_result = vkCreateDescriptorSetLayout(renderer.device, &descrptor_set_info, NULL, &pipeline_layout.camera_descriptor_set_layout);
+    if(descriptor_layout_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create descriptor set layout");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "descriptor set layout created successfully!");
+
+    // descriptor pool
+    VkDescriptorPoolSize pool_size = {};
+    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_size.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &pool_size;
+    pool_info.maxSets = MAX_FRAMES_IN_FLIGHT;
+
+    WL_LOG(WL_LOG_TRACE, "creating descriptor pool ...");
+    VkResult descriptor_pool_result;
+    descriptor_pool_result = vkCreateDescriptorPool(renderer.device, &pool_info, NULL, &pipeline_layout.descriptor_pool);
+    if(descriptor_pool_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create descriptor pool");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "descriptor pool created successfully!");
+
+    // allocating the descriptor sets
+    pipeline_layout.pCamera_descriptor_sets = (VkDescriptorSet*)wlAlloc(MAX_FRAMES_IN_FLIGHT*sizeof(VkDescriptorSet));
+
+    VkDescriptorSetLayout descriptor_layouts[MAX_FRAMES_IN_FLIGHT];
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
+        descriptor_layouts[i] = pipeline_layout.camera_descriptor_set_layout;
+    }
+
+    VkDescriptorSetAllocateInfo descriptor_set_alloc_info = {};
+    descriptor_set_alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptor_set_alloc_info.descriptorPool = pipeline_layout.descriptor_pool;
+    descriptor_set_alloc_info.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+    descriptor_set_alloc_info.pSetLayouts = descriptor_layouts;
+
+    WL_LOG(WL_LOG_TRACE, "allocating descriptor sets  ...");
+    VkResult descriptor_alloc_result;
+    descriptor_alloc_result = vkAllocateDescriptorSets(renderer.device, &descriptor_set_alloc_info, pipeline_layout.pCamera_descriptor_sets);
+    if(descriptor_alloc_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to allocate descriptor sets");
+        return;
+    }
+    WL_LOG(WL_LOG_TRACE, "descriptor sets allocated successfully!");
 
  ////////////////////////////////////////////////////////////
             //        pipeline layout          //
@@ -828,12 +889,9 @@ void wlCreateRasterizedRenderPipelineLayout(){
     VkPipelineLayoutCreateInfo layout_info = {};
     layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-    // getting the descriptor set data
-    pipeline_layout.pDescriptor_set_layouts = VK_NULL_HANDLE;
-    pipeline_layout.descriptor_set_layout_count = 0;
     // descriptor sets
-    layout_info.pSetLayouts = pipeline_layout.pDescriptor_set_layouts;
-    layout_info.setLayoutCount = pipeline_layout.descriptor_set_layout_count;
+    layout_info.pSetLayouts = &pipeline_layout.camera_descriptor_set_layout;
+    layout_info.setLayoutCount = 1;
     // push constants
     layout_info.pPushConstantRanges = VK_NULL_HANDLE;
     layout_info.pushConstantRangeCount = 0;
@@ -1141,7 +1199,7 @@ void wlCreateFrameBuffers(){
 
     WL_LOG(WL_LOG_TRACE, "swap chain buffers created successfully ...");
 }
-void wlRender(){
+void wlRender(glm::mat4 camera_matrix){
 
     // frames are in the context of processing, we know the order of
     // images are in the context of the swapchain, its random access from our POV;
@@ -1179,6 +1237,9 @@ void wlRender(){
     vkCmdBindPipeline(renderer.pGraphics_command_buffers[next_image_index], VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.simple_graphics_pipeline.pipeline);
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(renderer.pGraphics_command_buffers[next_image_index], 0, 1, &renderer.vertex_buffer.buffer, offsets);
+
+    wlUpdateCameraBuffer(camera_matrix);
+    vkCmdBindDescriptorSets(renderer.pGraphics_command_buffers[next_image_index], VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.basic_pipeline_layout.layout, 0, 1, &renderer.basic_pipeline_layout.pCamera_descriptor_sets[renderer.current_flight_frame_index], 0, NULL);
 
     VkViewport pViewports = {};
     pViewports.x = 0.0f;
@@ -1232,7 +1293,6 @@ void wlDestroyRenderer(){
     vkDestroyInstance(renderer.vulkan_instance, NULL);
 }
 
-
 ///////////////////////////////////////////////
        // RENDERING API FUNCTIONS //
  
@@ -1240,8 +1300,6 @@ typedef struct wl_object_data {
     uint32_t byte_offset, vertex_count;
 } wl_object_data;
 
-// this works only for one pipeline type for now
-// it puts the vcertices of the render objects into a vertex buffers that the shaders will use to render for the rest of the game
 uint32_t get_required_memory_index(VkMemoryRequirements requirements, uint32_t desired_properties_mask){
     VkPhysicalDeviceMemoryProperties properties;
     vkGetPhysicalDeviceMemoryProperties(renderer.physical_device, &properties);
@@ -1263,6 +1321,8 @@ uint32_t get_required_memory_index(VkMemoryRequirements requirements, uint32_t d
 
     return UINT32_MAX;
 }
+// this works only for one pipeline type for now
+// it puts the vcertices of the render objects into a vertex buffers that the shaders will use to render for the rest of the game
 void wlInitVertexBuffer(const WLRenderObject* pObjects,const uint32_t object_count){
 
     // holds the index of the next free index in the main buffer using bytes
@@ -1445,11 +1505,83 @@ void wlInitVertexBuffer(const WLRenderObject* pObjects,const uint32_t object_cou
     vkFreeMemory(renderer.device, staging_memory, NULL);
     vkDestroyBuffer(renderer.device, staging_buffer, NULL);
 }
-
 void updateVertexBuffer(WLRenderObject* pObjects, uint32_t object_count){
 for (size_t i = 0; i < object_count; i++){
         
     }
+}
+void wlCreateUniformBuffers(){
+
+    renderer.basic_pipeline_layout.pCamera_uniform_buffers = (VkBuffer*)wlAlloc(MAX_FRAMES_IN_FLIGHT*sizeof(VkBuffer));
+    renderer.basic_pipeline_layout.pCamera_uniform_buffer_memories = (VkDeviceMemory*)wlAlloc(MAX_FRAMES_IN_FLIGHT*sizeof(VkDeviceMemory));
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
+        VkBufferCreateInfo camera_unform_buffer_info = {};
+        camera_unform_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        camera_unform_buffer_info.size = sizeof(glm::mat4);
+        camera_unform_buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        camera_unform_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        WL_LOG(WL_LOG_TRACE, "creating uniform buffer ...");
+        VkResult buffer_result;
+        buffer_result = vkCreateBuffer(renderer.device, &camera_unform_buffer_info, NULL, &renderer.basic_pipeline_layout.pCamera_uniform_buffers[i]);
+        if(buffer_result != VK_SUCCESS){
+        WL_LOG(WL_LOG_FATAL, "failed to create uniform buffer");
+        return;
+        }
+        WL_LOG(WL_LOG_TRACE, "uniform buffer created successfully!");
+
+        VkMemoryRequirements camera_uniform_memory_requirements;
+        vkGetBufferMemoryRequirements(renderer.device, renderer.basic_pipeline_layout.pCamera_uniform_buffers[i], &camera_uniform_memory_requirements);
+
+        //allocating buffer on GPU
+        VkMemoryAllocateInfo camera_uniform_alloc_info = {};
+        camera_uniform_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        camera_uniform_alloc_info.allocationSize = camera_uniform_memory_requirements.size;
+        camera_uniform_alloc_info.memoryTypeIndex = get_required_memory_index(camera_uniform_memory_requirements, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+        WL_LOG(WL_LOG_TRACE, "allocating camera uniform buffer memory ...");
+        VkResult vert_aloc_result;
+        vert_aloc_result = vkAllocateMemory(renderer.device, &camera_uniform_alloc_info, NULL, &renderer.basic_pipeline_layout.pCamera_uniform_buffer_memories[i]);
+        if(vert_aloc_result != VK_SUCCESS){
+            WL_LOG(WL_LOG_FATAL, "failed to allocate camera uniform buffer memory ");
+            return;
+        }
+        WL_LOG(WL_LOG_TRACE, "camera uniform buffer memory allocated successfully!");
+
+        //binding memory
+        WL_LOG(WL_LOG_TRACE, "binding camera uniform buffer memory ...");
+        VkResult vert_bind_result;
+        vert_bind_result = vkBindBufferMemory(renderer.device, renderer.basic_pipeline_layout.pCamera_uniform_buffers[i], renderer.basic_pipeline_layout.pCamera_uniform_buffer_memories[i], 0);
+        if(vert_bind_result != VK_SUCCESS){
+            WL_LOG(WL_LOG_FATAL, "failed to bind camera uniform memory");
+            return;
+        }
+        WL_LOG(WL_LOG_TRACE, "camera uniform memory bound successfully!");
+
+        VkDescriptorBufferInfo buffer_info = {};
+        buffer_info.buffer = renderer.basic_pipeline_layout.pCamera_uniform_buffers[i];
+        buffer_info.offset = 0;
+        buffer_info.range = sizeof(glm::mat4);
+
+        VkWriteDescriptorSet descriptor_write = {};
+        descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_write.dstSet = renderer.basic_pipeline_layout.pCamera_descriptor_sets[i];
+        descriptor_write.dstBinding = 0;
+        descriptor_write.dstArrayElement = 0;
+        descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_write.descriptorCount = 1;
+        descriptor_write.pBufferInfo = &buffer_info;
+
+        vkUpdateDescriptorSets(renderer.device, 1, &descriptor_write, 0, NULL);
+    }
+
+}
+void wlUpdateCameraBuffer(glm::mat4 camera_matrix){ 
+    void* data;
+    vkMapMemory(renderer.device, renderer.basic_pipeline_layout.pCamera_uniform_buffer_memories[renderer.current_flight_frame_index], 0, sizeof(glm::mat4), 0, &data);
+    memcpy(data, &camera_matrix, sizeof(glm::mat4));
+    vkUnmapMemory(renderer.device, renderer.basic_pipeline_layout.pCamera_uniform_buffer_memories[renderer.current_flight_frame_index]);
 }
 
 

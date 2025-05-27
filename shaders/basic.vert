@@ -1,10 +1,9 @@
 #version 450
 
 // camera matrix
-layout(set = 0, binding = 0) uniform CameraUBO {
-    mat4 view;
-    mat4 proj;
-} ubo;
+layout(set = 0, binding = 0) uniform Camera {
+    mat4 view_proje;
+} camera;
 
 // vertex buffer input
 layout (location = 0) in vec3 inPosition;
@@ -14,6 +13,6 @@ layout (location = 1) in vec3 inColor;
 layout (location = 0) out vec4 fragColor;
 
 void main(){
-    gl_Position = vec4(inPosition, 1.0);
+    gl_Position = view_proje * vec4(inPosition, 1.0);
     fragColor = vec4(inColor, 1.0f);
 }

@@ -32,8 +32,8 @@ build/%.o: src/%.cpp
 
 #linking the compiled files
 $(EXECUTABLE_NAME): $(OBJECTS)
-	@glslangValidator -V --hlsl shaders/basic.vert -o shaders/basic_vert.spv
-	@glslangValidator -V --hlsl shaders/basic.frag -o shaders/basic_frag.spv
+	@glslangValidator -V shaders/basic.vert -o shaders/basic_vert.spv
+	@glslangValidator -V shaders/basic.frag -o shaders/basic_frag.spv
 	@echo Linking with $(LD)...
 	@$(LD) $(OBJECTS) -o $(EXECUTABLE_NAME) $(CFLAGS) $(LIBPATHS) $(LIBS) -lm
 	@echo Successfully built: $(EXECUTABLE_NAME)

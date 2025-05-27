@@ -2,6 +2,25 @@
 #define WL_CHUNK
 
 #include <core.h>
+#include <renderer.h>
+
+#ifndef WL_SVO_INSTANCE
+#define WL_SVO_INSTANCE
+// reference to the root node of an SVO on the SVO system
+typedef uint32_t SVOInstance;
+#endif
+
+#ifndef WL_VERTEX_OBJECT
+#define WL_VERTEX_OBJECT
+typedef struct WLVertex{
+    vec3f Pos, Color;
+} WLVertex;
+typedef struct WLRenderObject {
+    WLVertex* pVertex_buffer;
+    uint32_t vertex_count;
+    uint32_t unique_id;
+} WLRenderObject;
+#endif
 
 //
 //  this engine relies on 16x16x16 meter chunks, where each chunk has its own SVO

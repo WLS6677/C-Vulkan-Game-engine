@@ -13,8 +13,6 @@
 #define ROOT_OFFSET_DATA 5
 #define ROOT_DATA_AMMOUNT 6
 
-#define WL_DEBUG
-
 //typedef uint32_t SVONode;
 // the 31st (1)bit of this uint32_t is used as flag which will
 // split the nodes into either branch nodes of leaf notes:
@@ -432,7 +430,6 @@ void read_SVO_node_recursive(
     
     // getting node meta data
     float full_node_length = SMALLEST_VOXEL_LENGTH * (1<<node_level);
-    vec3f node_position = {};
 
     if(((node_data>>31) == 0) || (node_level == smallest_level)){
         read_callback(node_position, full_node_length, 0, node_data);

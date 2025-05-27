@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-float fast_inverse_square_root( float number ){
+inline float wl_fast_inverse_square_root( float number ){
 	int32_t i;
 	float x2, y;
 	const float threehalfs = 1.5F;
@@ -33,24 +33,24 @@ typedef struct {
 } WL32fVec3;
 
 // scale
-WL32fVec3 operator*(WL32fVec3 in, float scale ){
+inline WL32fVec3 operator*(WL32fVec3 in, float scale ){
     return WL32fVec3{in.x*scale,in.y*scale,in.z*scale};
 } 
 
 // normalize
-WL32fVec3 wlget32fVec3Normalized(WL32fVec3 in){
-    return in * fast_inverse_square_root(in.x*in.x + in.y*in.y + in.z*in.z);
+inline WL32fVec3 wlget32fVec3Normalized(WL32fVec3 in){
+    return in * wl_fast_inverse_square_root(in.x*in.x + in.y*in.y + in.z*in.z);
 }
 
 // vector products
-WL32fVec3 wlCross32fVec3(WL32fVec3 in_1, WL32fVec3 in_2){
+inline WL32fVec3 wlCross32fVec3(WL32fVec3 in_1, WL32fVec3 in_2){
     return WL32fVec3 {
         in_1.y*in_2.z - in_1.z*in_2.y,
         -in_1.x*in_2.z + in_1.z*in_2.x,
         in_1.x*in_2.y - in_1.y*in_2.x,
     };
 }
-float wlDot32fVec3(WL32fVec3 in_1, WL32fVec3 in_2){
+inline float wlDot32fVec3(WL32fVec3 in_1, WL32fVec3 in_2){
     return in_1.x*in_2.x + in_1.y*in_2.y + in_1.z*in_2.z;
 }
 

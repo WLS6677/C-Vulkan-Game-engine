@@ -102,6 +102,7 @@ void wlLog(WLResult result, const char* file, uint32_t line, const char* func, c
 struct WLEngine {
     WLWindow* pWindow;
     const char* engine_name;
+    WLScene main_scene;
 };
 WLEngine* wlCreateEngine(){
     WLEngine* engine;
@@ -156,7 +157,18 @@ WLEngine* wlCreateEngine(){
 
     wlInitVertexBuffer(&HELLO_TRIANGLE, 1);
 
+    engine->main_scene.camera.position.x = 0.4f;
+    engine->main_scene.camera.position.y = 0.2f;
+    engine->main_scene.camera.position.z = 0.1f;
 
+    engine->main_scene.camera.yaw = 10;
+    engine->main_scene.camera.pitch = 200;
+
+    engine->main_scene.chunk_count = 1;
+    engine->main_scene.pChunks = (WLChunk*)wlAlloc(sizeof(WLChunk));
+    
+    engine->main_scene.pChunks[1].SVO = wlCreateSVOInstance(vec3f{-8.0f,-8.0f,-8.0f}, WL_SVO_LEVEL_16_METERS, WL_SVO_LEVEL_1_METER);
+    //wlGenerateSVOWithRegion(engine->main_scene.pChunks[1].SVO, , 69420);
 
     return engine;
 }
@@ -167,8 +179,12 @@ void wlDestroyEngine(WLEngine* engine){
 }
 void wlRunEngine(WLEngine* engine){
     while(!wlWindowShouldClose(engine->pWindow)){
+        // polling inputs
         wlUpdateWindow(engine->pWindow);
-        wlRender();
+
+        // getting the camera
+        glm::mat4 camera_matrix = wlGetCameraMatrix(engine->main_scene);
+        wlRender(camera_matrix);
     }
     printf("shutting down...");
 }

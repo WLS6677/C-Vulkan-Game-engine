@@ -17,10 +17,14 @@ typedef uint32_t SVONode;
 //  they use the rest of the bits on data (colour/material index)
 
 
+
+#ifndef WL_SVO_INSTANCE
+#define WL_SVO_INSTANCE
 // reference to the root node of an SVO on the SVO system
 typedef uint32_t SVOInstance;
+#endif
 
-typedef enum SVOLevel {
+enum SVOLevel {
     WL_SVO_LEVEL_1_16th_METER   = 0,
     WL_SVO_LEVEL_1_8th_METER    = 1,
     WL_SVO_LEVEL_1_4th_METER    = 2,
@@ -34,7 +38,7 @@ typedef enum SVOLevel {
 };
 
 // when using "copy SVO to SVO" the function will need to know how to blend the two datas of the two SVO
-typedef enum SVOBlendType {
+enum SVOBlendType {
     SVO_BLEND_OVERWRITE, // will straight up replace all the voxels in the first SVO with the non_air voxels in the second SVO
 };
 
@@ -42,9 +46,10 @@ typedef enum SVOBlendType {
 // if it runs out it will attempt to allocate a new block of 2^23 and move over some SVOs to it in the bakcground
 void wlInitSVO();
 // creates the root of an SVO with the specified data and gives you the handle
-SVOInstance createSVOInstance(vec3f root_positon ,SVOLevel root_size, SVOLevel smallest_size);
+SVOInstance wlCreateSVOInstance(vec3f root_positon ,SVOLevel root_level, SVOLevel smallest_size);
 // fills a region of voxels with a material if the function returns true when it is sampled
-void generateSVOWithRegion(SVOInstance root, bool (sample_function)(vec3f), uint32_t material);
+
+void wlGenerateSVOWithRegion(SVOInstance root, bool (sample_function)(vec3f), uint32_t material);
 void wlReadSVO(SVOInstance SVO_root, void (read_voxel)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/));
 
 #endif
