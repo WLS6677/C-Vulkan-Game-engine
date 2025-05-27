@@ -1,5 +1,6 @@
 #include <core.h>
 #include <stdarg.h>
+#include <time.h>
 
 struct WLAllocator {
     uint8_t* rootPointer;
@@ -181,6 +182,12 @@ void wlRunEngine(WLEngine* engine){
     while(!wlWindowShouldClose(engine->pWindow)){
         // polling inputs
         wlUpdateWindow(engine->pWindow);
+
+        struct timespec current_time;
+        clock_gettime(CLOCK_MONOTONIC, &current_time);
+        engine->main_scene.camera.yaw = current_time.tv_sec*10;
+        engine->main_scene.camera.pitch = current_time.tv_sec*2;
+
 
         // getting the camera
         glm::mat4 camera_matrix = wlGetCameraMatrix(engine->main_scene);

@@ -1577,7 +1577,7 @@ void wlCreateUniformBuffers(){
     }
 
 }
-void wlUpdateCameraBuffer(glm::mat4 camera_matrix){ 
+void wlUpdateCameraBuffer(glm::mat4 camera_matrix){
     void* data;
     vkMapMemory(renderer.device, renderer.basic_pipeline_layout.pCamera_uniform_buffer_memories[renderer.current_flight_frame_index], 0, sizeof(glm::mat4), 0, &data);
     memcpy(data, &camera_matrix, sizeof(glm::mat4));

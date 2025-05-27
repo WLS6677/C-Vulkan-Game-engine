@@ -24,9 +24,9 @@ glm::mat4x4 wlGetCameraMatrix(WLScene scene){
 
     // getting the axis that the camera is looking in the direction of
     vec3f forward_direction_vector; // Z axis in camera space
-    forward_direction_vector.x = cos(scene.camera.pitch) * cos(scene.camera.yaw);
-    forward_direction_vector.y = sin(scene.camera.pitch);
-    forward_direction_vector.z = cos(scene.camera.pitch) * sin(scene.camera.yaw);
+    forward_direction_vector.x = cos(glm::radians(scene.camera.pitch)) * cos(glm::radians(scene.camera.yaw));
+    forward_direction_vector.y = sin(glm::radians(scene.camera.pitch));
+    forward_direction_vector.z = cos(glm::radians(scene.camera.pitch)) * sin(glm::radians(scene.camera.yaw));
 
     vec3f right_direction_vector; // X axis in camera space
     // the X product of the world vertical axis and the forward would give the right vector
