@@ -160,13 +160,13 @@ uint32_t get_child_node_count(const uint32_t mask){
     }
     return count;   
 }
-void generate_SVO_node_recursive(SVOInstance SVO_root, bool (sample_function)(vec3f), uint32_t material, uint32_t node_voxel_level, uint32_t smallest_level, vec3f node_position){
+void generate_SVO_node_recursive(SVOInstance node_offset, bool (sample_function)(vec3f), uint32_t material, uint32_t node_voxel_level, uint32_t smallest_level, vec3f node_position){
 
     #ifdef WL_DEBUG
     debug_voxel_counter++;
     #endif
 
-    uint32_t* root = SVO_manager.SVO_array + SVO_root;
+    uint32_t* root = SVO_manager.SVO_array + node_offset;
     float full_node_length = SMALLEST_VOXEL_LENGTH * (1<<node_voxel_level);
 
     if(node_voxel_level==smallest_level){
@@ -274,10 +274,10 @@ void generate_SVO_node_recursive(SVOInstance SVO_root, bool (sample_function)(ve
 }
 
 // fills a region of voxels with a material of the function which returns true when it is sampled at a point in 3d space
-void wlGenerateSVOWithRegion(SVOInstance SVO_root, bool (sample_function)(vec3f), uint32_t material){
+void wlGenerateSVOWithRegion(SVOInstance SVO_root_offset, bool (sample_function)(vec3f), uint32_t material){
 
     // converting the index to the pointer from the array
-    uint32_t* root = SVO_manager.SVO_array + SVO_root;
+    uint32_t* root = SVO_manager.SVO_array + SVO_root_offset;
 
     WL_LOG(WL_LOG_TRACE, "the root point set");
 
@@ -413,8 +413,147 @@ void wlGenerateSVOWithRegion(SVOInstance SVO_root, bool (sample_function)(vec3f)
     #endif
     WL_LOG(WL_LOG_TRACE, " recursive Tree generated successfully!");
 }   
-void wlReadSVO(SVOInstance SVO_root, void (read_voxel)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/)){
+
+/////////////////////////////////////////////////
+        //       reading SVO      //
+
+void read_SVO_node_recursive(
+    uint32_t node_offset, 
+    uint32_t node_level,
+    uint32_t smallest_level,
+    vec3f node_position,
+    void (read_callback)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/)
+){
+    //converting the index to the pointer from the array
+    uint32_t* node = SVO_manager.SVO_array + node_offset;
+
+    // the SVO node data
+    uint32_t node_data = node[ROOT_OFFSET_DATA];
+    
+    // getting node meta data
+    float full_node_length = SMALLEST_VOXEL_LENGTH * (1<<node_level);
+    vec3f node_position = {};
+
+    if(((node_data>>31) == 0) || (node_level == smallest_level)){
+        read_callback(node_position, full_node_length, 0, node_data);
+        return;
+    }
+
+    //for reading children nodes
+    uint32_t childnode_mask = (node_data>>23) & ((1<<8)-1);
+
+    // we read wether the node is a leaf of branch based on the mask results
+    uint32_t child_node_count = get_child_node_count(childnode_mask);
+    if(child_node_count==0){
+        WL_LOG(WL_LOG_TRACE, "node is an empty leaf and even tho it said its not in the flag");
+        return;
+    }
+
+///////////////////////////////////////////////////////////
+        //      reading the child nodes        //
+
+    WL_LOG(WL_LOG_TRACE, "proceeding with child nodes...");
+
+    // getting the order of the child nodes from the mask
+    // this will assign which nth bit the child belongs to
+    // this is so we can use a lookup table to get the position offset of the child node
+    uint32_t counter = 0;
+    uint32_t child_orders[child_node_count] = {};
+    for (size_t i = 0; i < 8; i++){
+        if(((childnode_mask>>i)&1)==1){
+            child_orders[counter] = i;
+            counter++;
+        }
+    }
+
+    WL_LOG(WL_LOG_TRACE, "entering the black hole (recusive generation)...");
+
+    float half_node_length = full_node_length / 2;
+
+    //sending out the recursive algorithem
+    for (size_t i = 0; i < child_node_count; i++){
+        vec3f child_node_pos {
+            node_position.x + child_offsets[child_orders[i]].x * half_node_length,
+            node_position.y + child_offsets[child_orders[i]].y * half_node_length,
+            node_position.z + child_offsets[child_orders[i]].z * half_node_length
+        };
+        read_SVO_node_recursive(node_data+i, node_level-1, smallest_level, child_node_pos , read_callback);
+    }
+
+    #ifdef WL_DEBUG
+    printf("created %u voxels.\n toatl bytes used: %u\n", debug_voxel_counter, SVO_manager.allocated_ammount*sizeof(uint_least32_t));
+    #endif
+    WL_LOG(WL_LOG_TRACE, " recursive Tree generated successfully!");
     
 }
+void wlReadSVO(SVOInstance SVO_root_offset, void (read_callback)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/)){
+    // converting the index to the pointer from the array
+    uint32_t* root = SVO_manager.SVO_array + SVO_root_offset;
+    WL_LOG(WL_LOG_TRACE, "the root point set");
+
+    // the SVO node data
+    uint32_t root_data = root[ROOT_OFFSET_DATA];
+    
+    // getting root meta data
+    uint32_t root_voxel_level = root[ROOT_OFFSET_LEVEL];
+    float full_node_length = SMALLEST_VOXEL_LENGTH * (1<<root_voxel_level);
+    uint32_t smallest_level = root[ROOT_OFFSET_SMALLEST_LEVEL];
+    vec3f root_position = {};
+    root_position.x = *(float*)(root + 2);
+    root_position.y = *(float*)(root + 3);
+    root_position.z = *(float*)(root + 4);
+
+    if(root_data>>31 == 0){
+        read_callback(root_position, full_node_length, 0, root_data);
+        return;
+    }
+
+    //for reading children nodes
+    uint32_t childnode_mask = (root_data>>23) & ((1<<8)-1);
+
+    // we read wether the node is a leaf of branch based on the mask results
+    uint32_t child_node_count = get_child_node_count(childnode_mask);
+    if(child_node_count==0){
+        WL_LOG(WL_LOG_TRACE, "root is an empty leaf and even tho it said its not in the flag");
+        return;
+    }
+
+///////////////////////////////////////////////////////////
+        //      reading the child nodes        //
+
+    WL_LOG(WL_LOG_TRACE, "proceeding with child node...");
+
+    // getting the order of the child nodes from the mask
+    // this will assign which nth bit the child belongs to
+    // this is so we can use a lookup table to get the position offset of the child node
+    uint32_t counter = 0;
+    uint32_t child_orders[child_node_count] = {};
+    for (size_t i = 0; i < 8; i++){
+        if(((childnode_mask>>i)&1)==1){
+            child_orders[counter] = i;
+            counter++;
+        }
+    }
+
+    WL_LOG(WL_LOG_TRACE, "entering the black hole (recusive generation)...");
+
+    float half_node_length = full_node_length / 2;
+
+    //sending out the recursive algorithem
+    for (size_t i = 0; i < child_node_count; i++){
+        vec3f child_node_pos {
+            root_position.x + child_offsets[child_orders[i]].x * half_node_length,
+            root_position.y + child_offsets[child_orders[i]].y * half_node_length,
+            root_position.z + child_offsets[child_orders[i]].z * half_node_length
+        };
+        read_SVO_node_recursive(root_data+i, root_voxel_level-1, smallest_level, child_node_pos , read_callback);
+    }
+
+    #ifdef WL_DEBUG
+    printf("created %u voxels.\n toatl bytes used: %u\n", debug_voxel_counter, SVO_manager.allocated_ammount*sizeof(uint_least32_t));
+    #endif
+    WL_LOG(WL_LOG_TRACE, " recursive Tree generated successfully!");
+    
+}   
 
 

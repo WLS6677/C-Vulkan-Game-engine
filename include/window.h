@@ -29,7 +29,7 @@ void wlDestroyWindow(WLWindow* window);
 bool wlWindowShouldClose(WLWindow* window);
 
 // the X is width, the Y is height.
-WLU32Vec2 wlGetWindowSize(WLWindow* window);
+WL32uVec2 wlGetWindowSize(WLWindow* window);
 
 // this is for the renderer to resize the frame buffer when the window is resized
 //WLResult wlSetWindowResizeCallback(WLWindow* window, void (*callback)(GLFWwindow*, int /*width*/, int /*height*/));

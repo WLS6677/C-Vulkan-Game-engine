@@ -17,15 +17,24 @@ render function that does a render pass with command bufffers >/
 render our first triangle >/
 
 make uniforms with their descriptor sets to have a camera view
+make a prespective camera >/
 
 make an SVO >/
 SVO sample function based generation >/
 make a perlin noise based sample function
-SVO read function with callback
+SVO read function with callback to generate the mesh >/
 assemble render objects from SVO using the callback from ReadSVO
-render vertex buffer using the renderer
+render vertex buffer using the renderer >/
 
-gamescripts aka exposed API being used to run a simple game
+generate 4 chunks and render them successfuly
+implement player navigation with inputs to change camera
+
+
+
+gamescripts aka exposed API being used to run a simple player controller
+    pos/direction/fov camera handle
+    update function
+    startup function
 
 UI pipeline that takes UIrenderObjects
 

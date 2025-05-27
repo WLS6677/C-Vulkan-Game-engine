@@ -5,7 +5,7 @@
 struct WLWindow{
     GLFWwindow* pWindow;
     GLFWmonitor* pMonitor;
-    WLU32Vec2 size;
+    WL32uVec2 size;
     bool is_resizable;
 };
 
@@ -65,8 +65,8 @@ bool wlWindowShouldClose(WLWindow* window){
     }
     return glfwWindowShouldClose(window->pWindow);
 }
-WLU32Vec2 getWindowSize(WLWindow* window){
-    WLU32Vec2 size{0,0};
+WL32uVec2 getWindowSize(WLWindow* window){
+    WL32uVec2 size{0,0};
     return size;
 }
 const char** wlGetRequiredWindowInstanceExtensions(uint32_t* pSize){

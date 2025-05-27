@@ -5,6 +5,7 @@
 #include <time.h>
 #include <wlmath.h>
 #include <stdlib.h>
+#include <SVO.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,7 +18,10 @@ extern "C" {
 #ifdef WL_MATH
 
 #define vec2u32 WLU32Vec2
-#define vec3f WLFLOATVec3
+
+#ifndef vec3f
+#define vec3f WL32fVec3
+#endif
 
 #endif //WL_MATH
 

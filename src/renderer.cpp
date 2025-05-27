@@ -818,6 +818,11 @@ void wlCreateRasterizedRenderPipelineLayout(){
     WL_LOG(WL_LOG_TRACE, "render pass created successfully!");
 
  ////////////////////////////////////////////////////////////
+            //       descriptor sets      //
+
+    
+
+ ////////////////////////////////////////////////////////////
             //        pipeline layout          //
 
     VkPipelineLayoutCreateInfo layout_info = {};
