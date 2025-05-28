@@ -3,7 +3,7 @@
 
 #define MAX_SVO_NODE_COUNT ( 1<<23 )
 #define MAX_FREED_INDICES ( 1<<20 )
-#define SMALLEST_VOXEL_LENGTH 5.0f
+#define SMALLEST_VOXEL_LENGTH (1.0/16.0f)
 
 #define ROOT_OFFSET_LEVEL 0
 #define ROOT_OFFSET_SMALLEST_LEVEL 1
@@ -25,7 +25,7 @@
 //  they use the rest of the bits on data (colour/material index)
 
 #ifdef WL_GENERATE_NOISE
-#define RANDOM_BOOL ((bool)rand()%2);
+#define RANDOM_BOOL ((bool)((rand()%2)==0));
 #endif
 #ifdef WL_DEBUG
     static int debug_voxel_counter = 0;
@@ -45,17 +45,14 @@ static struct {
     uint32_t* freed_indices;
     uint32_t allocated_ammount;
     uint32_t freed_indices_count;
-} SVO_manager = {
-    NULL,   // SVO_array
-    NULL,   // freed_indices
-    0,      // allocated ammount
-    0       // freed_indices_count
-};
+} SVO_manager;
 
 void wlInitSVO() {
     WL_LOG(WL_LOG_TRACE, "initiating SVO...");
     SVO_manager.SVO_array = (uint32_t*)wlAlloc((MAX_SVO_NODE_COUNT)*sizeof(SVONode));
     SVO_manager.freed_indices = (uint32_t*)wlAlloc(MAX_FREED_INDICES*(sizeof(uint32_t)));
+    SVO_manager.allocated_ammount = 0;
+    SVO_manager.freed_indices_count = 0;
     WL_LOG(WL_LOG_TRACE, "SVO initiated successfully!");
 }
 
@@ -168,15 +165,11 @@ void generate_SVO_node_recursive(SVOInstance node_offset, bool (sample_function)
     float full_node_length = SMALLEST_VOXEL_LENGTH * (1<<node_voxel_level);
 
     if(node_voxel_level==smallest_level){
-        #ifndef WL_GENERATE_NOISE
         *root = material;
-        #else 
-        *root = (rand() & (UINT32_MAX-1));
-        #endif
         return;
     }
 
-/////////////////////////////////////////////////////
+ /////////////////////////////////////////////////////
             //      sampling        //
 
     vec3f sample_position{
@@ -195,30 +188,23 @@ void generate_SVO_node_recursive(SVOInstance node_offset, bool (sample_function)
         for (size_t Y = 0; Y < 2; Y++){
             for (size_t X = 0; X < 2; X++){
                 
-                uint32_t temp_child_node_mask = 0;
-                temp_child_node_mask = sample_8_corners_of_node(
+                uint32_t temp_child_8_corners_mask = 0;
+                temp_child_8_corners_mask = sample_8_corners_of_node(
                     vec3f { sample_position.x + X * half_node_length,
                             sample_position.y + Y * half_node_length,
                             sample_position.z + Z * half_node_length },
                     half_node_length,
                     sample_function
                 );
-                #ifndef WL_GENERATE_NOISE
                 // if the node is part of the tree (not air) store it to be iterated over
-                if(temp_child_node_mask!=0){
+                if(temp_child_8_corners_mask!=0){
                     child_node_mask |= 1<<(X + 2*Y + 4*Z);
                 }
 
                 // if all 8 corners of the potential node are full, write it to the full nodes mask
-                if(temp_child_node_mask==((1<<8)-1)){
+                if(temp_child_8_corners_mask==((1<<8)-1)){
                     node_is_full_sample_mask |= 1<<(X + 2*Y + 4*Z);
                 }
-                #else // WL_GENERATE_NOISE
-                // only generates parent and air nodes and min size voxels
-                if(RANDOM_BOOL){
-                    child_node_mask |= 1<<(X + 2*Y + 4*Z);
-                }
-                #endif // WL_GENERATE_NOISE
             }
         }
     }
@@ -232,6 +218,8 @@ void generate_SVO_node_recursive(SVOInstance node_offset, bool (sample_function)
     printf("%u: the child node count: %u\n", debug_voxel_counter, child_node_count);
     printf("%u: the full nodes mask:", debug_voxel_counter);
     print_binary(node_is_full_sample_mask);
+    printf("voxel %u: ",debug_voxel_counter);
+    print_binary(*root);
     #endif
 
     
@@ -272,7 +260,7 @@ void generate_SVO_node_recursive(SVOInstance node_offset, bool (sample_function)
 }
 
 // fills a region of voxels with a material of the function which returns true when it is sampled at a point in 3d space
-void wlGenerateSVOWithRegion(SVOInstance SVO_root_offset, bool (sample_function)(vec3f), uint32_t material){
+void wlGenerateSVOWithSampleFunction(SVOInstance SVO_root_offset, bool (*sample_function)(vec3f), uint32_t material){
 
     // converting the index to the pointer from the array
     uint32_t* root = SVO_manager.SVO_array + SVO_root_offset;
@@ -288,10 +276,6 @@ void wlGenerateSVOWithRegion(SVOInstance SVO_root_offset, bool (sample_function)
     root_position.z = *(float*)(root + 4);
 
     float full_node_length = SMALLEST_VOXEL_LENGTH * (1<<root_voxel_level);
-
-    //for reading children nodes
-    //uint32_t mask = (root_data>>23) & ((1<<8)-1);
-
 
 /////////////////////////////////////////////////////
             //      sampling        //
@@ -320,8 +304,8 @@ void wlGenerateSVOWithRegion(SVOInstance SVO_root_offset, bool (sample_function)
     for (size_t Z = 0; Z < 2; Z++){
         for (size_t Y = 0; Y < 2; Y++){
             for (size_t X = 0; X < 2; X++){
-                uint32_t temp_child_node_index = 0;
-                temp_child_node_index = sample_8_corners_of_node(
+                uint32_t temp_child_8_corners_mask = 0;
+                temp_child_8_corners_mask = sample_8_corners_of_node(
                     vec3f { sample_position.x + X * half_node_length,
                             sample_position.y + Y * half_node_length,
                             sample_position.z + Z * half_node_length },
@@ -330,23 +314,17 @@ void wlGenerateSVOWithRegion(SVOInstance SVO_root_offset, bool (sample_function)
                 );
                 
                 // if the node is part of the tree (not air) store it to be iterated over
-                if(temp_child_node_index!=0){
+                if(temp_child_8_corners_mask!=0){
                     childnode_mask |= 1<<(X + 2*Y + 4*Z);
                 }
 
                 // if all 8 corners of the potential node are full, write it to the full nodes mask
-                if(temp_child_node_index==((1<<8)-1)){
+                if(temp_child_8_corners_mask==((1<<8)-1)){
                     node_is_full_sample_mask |= 1<<(X + 2*Y + 4*Z);
                 }
             }
         }
     }
-
-    #ifdef GENERATE_NOISE
-    child_node_mask = RANDOM_BOOL;
-    node_is_full_sample_mask = RANDOM_BOOL;
-    #endif
-    
 
     WL_LOG(WL_LOG_TRACE, "8 child nodes sampled!");
 
@@ -378,7 +356,6 @@ void wlGenerateSVOWithRegion(SVOInstance SVO_root_offset, bool (sample_function)
     WL_LOG(WL_LOG_TRACE, "proceeding with child node generation...");
 
     root[ROOT_OFFSET_DATA] = SVO_alloc_children_nodes(child_node_count);
-    uint32_t children_index = root[ROOT_OFFSET_DATA];
     root[ROOT_OFFSET_DATA] |= childnode_mask<<23; //storing the mask
     root[ROOT_OFFSET_DATA] |= 1<<31; //setting the flag as branch
 
@@ -395,6 +372,8 @@ void wlGenerateSVOWithRegion(SVOInstance SVO_root_offset, bool (sample_function)
     }
 
     WL_LOG(WL_LOG_TRACE, "entering the black hole (recusive generation)...");
+
+    uint32_t children_index = root[ROOT_OFFSET_DATA] & (UINT32_MAX>>8);
 
     //sending out the recursive algorithem
     for (size_t i = 0; i < child_node_count; i++){
@@ -420,18 +399,15 @@ void read_SVO_node_recursive(
     uint32_t node_level,
     uint32_t smallest_level,
     vec3f node_position,
-    void (read_callback)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/)
+    void (*read_callback)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/)
 ){
-    //converting the index to the pointer from the array
-    uint32_t* node = SVO_manager.SVO_array + node_offset;
-
     // the SVO node data
-    uint32_t node_data = node[ROOT_OFFSET_DATA];
+    uint32_t node_data = SVO_manager.SVO_array[node_offset];
     
     // getting node meta data
     float full_node_length = SMALLEST_VOXEL_LENGTH * (1<<node_level);
 
-    if(((node_data>>31) == 0) || (node_level == smallest_level)){
+    if((node_data>>31) == 0){
         read_callback(node_position, full_node_length, 0, node_data);
         return;
     }
@@ -449,7 +425,7 @@ void read_SVO_node_recursive(
 ///////////////////////////////////////////////////////////
         //      reading the child nodes        //
 
-    WL_LOG(WL_LOG_TRACE, "proceeding with child nodes...");
+    //WL_LOG(WL_LOG_TRACE, "proceeding with child nodes...");
 
     // getting the order of the child nodes from the mask
     // this will assign which nth bit the child belongs to
@@ -463,10 +439,11 @@ void read_SVO_node_recursive(
         }
     }
 
-    WL_LOG(WL_LOG_TRACE, "entering the black hole (recusive generation)...");
+    //WL_LOG(WL_LOG_TRACE, "entering the black hole (recusive generation)...");
 
     float half_node_length = full_node_length / 2;
 
+    uint32_t child_node_offset = node_data & (UINT32_MAX >> 9);
     //sending out the recursive algorithem
     for (size_t i = 0; i < child_node_count; i++){
         vec3f child_node_pos {
@@ -474,19 +451,21 @@ void read_SVO_node_recursive(
             node_position.y + child_offsets[child_orders[i]].y * half_node_length,
             node_position.z + child_offsets[child_orders[i]].z * half_node_length
         };
-        read_SVO_node_recursive(node_data+i, node_level-1, smallest_level, child_node_pos , read_callback);
+        read_SVO_node_recursive(child_node_offset, node_level-1, smallest_level, child_node_pos , read_callback);
     }
 
-    #ifdef WL_DEBUG
-    printf("created %u voxels.\n toatl bytes used: %u\n", debug_voxel_counter, SVO_manager.allocated_ammount*sizeof(uint_least32_t));
+    #ifdef WL_DEBUG_no
+    printf("read %u voxels.\n toatl bytes used: %u\n", debug_voxel_counter, SVO_manager.allocated_ammount*sizeof(uint_least32_t));
+    WL_LOG(WL_LOG_TRACE, " recursive Tree read successfully!");
     #endif
-    WL_LOG(WL_LOG_TRACE, " recursive Tree generated successfully!");
+    
     
 }
-void wlReadSVO(SVOInstance SVO_root_offset, void (read_callback)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/)){
+void wlReadSVO(SVOInstance SVO_root_offset, void (*read_callback)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/)){
     // converting the index to the pointer from the array
     uint32_t* root = SVO_manager.SVO_array + SVO_root_offset;
-    WL_LOG(WL_LOG_TRACE, "the root point set");
+    WL_LOG(WL_LOG_TRACE, "Reading SVO");
+    printf("SVO index: %u\n", SVO_root_offset);
 
     // the SVO node data
     uint32_t root_data = root[ROOT_OFFSET_DATA];
@@ -532,10 +511,11 @@ void wlReadSVO(SVOInstance SVO_root_offset, void (read_callback)(vec3f/*voxel po
         }
     }
 
-    WL_LOG(WL_LOG_TRACE, "entering the black hole (recusive generation)...");
+    WL_LOG(WL_LOG_TRACE, "entering the black hole (recusive reading with callback)...");
 
     float half_node_length = full_node_length / 2;
 
+    uint32_t child_node_offset = root_data & (UINT32_MAX >> 8);
     //sending out the recursive algorithem
     for (size_t i = 0; i < child_node_count; i++){
         vec3f child_node_pos {
@@ -543,13 +523,16 @@ void wlReadSVO(SVOInstance SVO_root_offset, void (read_callback)(vec3f/*voxel po
             root_position.y + child_offsets[child_orders[i]].y * half_node_length,
             root_position.z + child_offsets[child_orders[i]].z * half_node_length
         };
-        read_SVO_node_recursive(root_data+i, root_voxel_level-1, smallest_level, child_node_pos , read_callback);
+        #ifdef WL_DEBUG
+        printf("reading %u\n", child_node_offset+i);
+        #endif
+        read_SVO_node_recursive(child_node_offset, root_voxel_level-1, smallest_level, child_node_pos , read_callback);
     }
 
     #ifdef WL_DEBUG
     printf("created %u voxels.\n toatl bytes used: %u\n", debug_voxel_counter, SVO_manager.allocated_ammount*sizeof(uint_least32_t));
     #endif
-    WL_LOG(WL_LOG_TRACE, " recursive Tree generated successfully!");
+    WL_LOG(WL_LOG_TRACE, " recursive Tree read successfully!");
     
 }   
 

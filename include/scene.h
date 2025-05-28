@@ -21,6 +21,7 @@ typedef struct WLScene {
 // will convert all chunks and objects to meshes/WLRenderObjects and send them to the GPU
 // TODO: make a ver that only submits changed chunks
 void wlCreateSceneMeshObjects(WLScene scene);
+void wlMoveCamera(WLScene* scene, float dt);
 glm::mat4x4 wlGetCameraMatrix(WLScene scene);
 
 

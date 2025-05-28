@@ -13,7 +13,14 @@
         "*.frag": "glsl",
         "string": "cpp",
         "string_view": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "text_encoding": "cpp",
+        "format": "cpp",
+        "deque": "cpp",
+        "vector": "cpp",
+        "memory": "cpp",
+        "optional": "cpp",
+        "system_error": "cpp"
     },
 
     "editor.quickSuggestions": {

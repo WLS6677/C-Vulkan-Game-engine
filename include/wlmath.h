@@ -2,6 +2,7 @@
 #define WL_MATH
 
 #include <stdint.h>
+#include <math.h>
 
 inline float wl_fast_inverse_square_root( float number ){
 	int32_t i;
@@ -32,6 +33,28 @@ typedef struct {
     float x, y, z;
 } WL32fVec3;
 
+// add
+inline WL32fVec3 operator+(WL32fVec3 in_1, WL32fVec3 in_2 ){
+    return WL32fVec3{
+        in_1.x + in_2.x,
+        in_1.y + in_2.y,
+        in_1.z + in_2.z
+    };
+}
+inline void operator+=(WL32fVec3& in_1, WL32fVec3 in_2 ){
+    in_1 = WL32fVec3{
+        in_1.x + in_2.x,
+        in_1.y + in_2.y,
+        in_1.z + in_2.z
+    };
+}
+inline void operator-=(WL32fVec3& in_1, WL32fVec3 in_2 ){
+    in_1 = WL32fVec3{
+        in_1.x - in_2.x,
+        in_1.y - in_2.y,
+        in_1.z - in_2.z
+    };
+}
 // scale
 inline WL32fVec3 operator*(WL32fVec3 in, float scale ){
     return WL32fVec3{in.x*scale,in.y*scale,in.z*scale};
@@ -54,5 +77,13 @@ inline float wlDot32fVec3(WL32fVec3 in_1, WL32fVec3 in_2){
     return in_1.x*in_2.x + in_1.y*in_2.y + in_1.z*in_2.z;
 }
 
+// random stuff
+inline float wl_fake_random_thingy(WL32fVec3 pos){
+    float hash = (pos.x * 73856093) + (pos.y * 19349663) + (pos.z * 83492791);
+    hash += pow(hash, 13);
+    hash *= 0x5bd1e995;
+    hash += pow(hash, 5);
+    return hash;
+}
 
 #endif

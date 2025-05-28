@@ -51,6 +51,7 @@ typedef struct WLChunk {
     uint64_t unique_id;
 } WLChunk;
 
+void wlGenerateChunkSVO(WLChunk* chunk);
 WLRenderObject WLGetChunkSVOMesh(WLChunk chunk);
 
 #endif

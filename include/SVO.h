@@ -49,7 +49,7 @@ void wlInitSVO();
 SVOInstance wlCreateSVOInstance(vec3f root_positon ,SVOLevel root_level, SVOLevel smallest_size);
 // fills a region of voxels with a material if the function returns true when it is sampled
 
-void wlGenerateSVOWithRegion(SVOInstance root, bool (sample_function)(vec3f), uint32_t material);
-void wlReadSVO(SVOInstance SVO_root, void (read_voxel)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/));
+void wlGenerateSVOWithSampleFunction(SVOInstance root, bool (*sample_function)(vec3f), uint32_t material);
+void wlReadSVO(SVOInstance SVO_root_offset, void (*read_callback)(vec3f/*voxel position*/, float/*voxel side length*/, uint32_t/*neighbouring voxels mask*/, uint32_t/*material*/));
 
 #endif

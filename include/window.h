@@ -4,7 +4,6 @@
 #include <core.h>
 
 // this will hold the data of the window, you just need to store it.
-typedef struct WLWindow WLWindow;
 typedef enum  {
     WL_WINDOWED,
     WL_FULLSCREEN_BORDERLESS,
@@ -14,29 +13,37 @@ typedef enum  {
 
 // the window will be wrapped in its own API so it can be either handled by the Renderer or be ran by the Main logic.
 // you will need to make a WLwindow variable, and then create the Window, then update the window, and close the widnow when the app closes.
-WLWindow* wlCreateWindow(const char* name, WLWindowType type);
+void wlCreateWindow(const char* name, WLWindowType type);
 
 // this is for when you change the settings of the window (type).
-void wlReCreateWindow(WLWindow* window, const char* name, WLWindowType type);
+void wlReCreateWindow(const char* name, WLWindowType type);
 
 // polls events for the window and updates it.
-void wlUpdateWindow(WLWindow* window);
+void wlUpdateWindow();
 
 // optional if you want to close the window but keep the app running.
-void wlDestroyWindow(WLWindow* window);
+void wlDestroyWindow();
 
 // this will determine the while() loop of the app.
-bool wlWindowShouldClose(WLWindow* window);
+bool wlWindowShouldClose();
 
 // the X is width, the Y is height.
-WL32uVec2 wlGetWindowSize(WLWindow* window);
+WL32uVec2 wlGetWindowSize();
+
+//retruns the cursor position relative to the window
+//
+// X = +1.0 the top edge of the window
+// Y = +1.0 the right edge of window
+//
+WL32fVec2 wlGetCursorPositon();
+WL32fVec3 wlGetMovementDirectionFreeMove();
 
 // this is for the renderer to resize the frame buffer when the window is resized
 //WLResult wlSetWindowResizeCallback(WLWindow* window, void (*callback)(GLFWwindow*, int /*width*/, int /*height*/));
 
 // wrapper for glfwGetRequiredInstanceExtensions
-const char** wlGetRequiredWindowInstanceExtensions(uint32_t* size);
+const char** wlGetRequiredWindowInstanceExtensions(uint32_t* pSize);
 // for renderer/Vulkan specific functions
-void* wlGetRawWindowHandle(WLWindow* window);
+void* wlGetRawWindowHandle();
 
 #endif

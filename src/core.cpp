@@ -27,7 +27,7 @@ uint8_t* wlAlloc(uint32_t request_size){
 
     // check if there is capacity to allocate
     if(request_size > allocator.max_allocation_size-allocator.allocated_amount){
-        printf("requested allocation surpasses max allocation amount\n");
+        WL_LOG(WL_LOG_FATAL,"requested allocation surpasses max allocation amount");
         printf("Max size: %u\n", allocator.max_allocation_size);
         printf("current allocated amount: %u\n", allocator.allocated_amount);
         printf("requested amount: %u\n", request_size);
@@ -101,7 +101,6 @@ void wlLog(WLResult result, const char* file, uint32_t line, const char* func, c
 //////////////////////////////////////
 
 struct WLEngine {
-    WLWindow* pWindow;
     const char* engine_name;
     WLScene main_scene;
 };
@@ -116,14 +115,10 @@ WLEngine* wlCreateEngine(){
         return NULL;
     }
 
-    engine->pWindow = wlCreateWindow("yo", WL_WINDOWED);
-    if(engine->pWindow==NULL){
-        WL_LOG(WL_LOG_FATAL, "failed to create window");
-        wlReleaseAlloc();
-        return NULL;
-    }
+    wlCreateWindow("yo", WL_WINDOWED);
+    
 
-    void* window_wandle = wlGetRawWindowHandle(engine->pWindow);
+    void* window_wandle = wlGetRawWindowHandle();
     
     wlCreateRenderer(window_wandle);
     if(false)
@@ -150,44 +145,66 @@ WLEngine* wlCreateEngine(){
 
         {{0.0f,-0.5f,0.0f},{1.0f,0.0f,0.0f}},
         {{0.5f,0.5f,0.0f},{0.0f,1.0f,0.0f}},
-        {{-0.5f,0.5f,0.0f},{0.0f,0.0f,1.0f}}
+        {{-0.5f,0.5f,0.0f},{0.0f,0.0f,1.0f}},
+
+        {{5.0f,-5.0f,0.0f},{1.0f,0.0f,0.0f}},
+        {{-5.0f,5.0f,0.0f},{1.0f,0.0f,0.0f}},
+        {{-5.0f,-5.0f,0.0f},{1.0f,0.0f,0.0f}},
+
+        {{10.5f,0.0f,0.0f},{1.0f,0.0f,0.0f}},
+        {{-10.5f,0.0f,0.0f},{0.0f,1.0f,0.0f}},
+        {{10.0f,0.5f,0.0f},{0.0f,0.0f,1.0f}},
+
+        {{10.5f,0.5f,0.0f},{1.0f,0.0f,0.0f}},
+        {{-0.5f,0.0f,0.0f},{0.0f,1.0f,0.0f}},
+        {{10.0f,0.5f,0.0f},{0.0f,0.0f,1.0f}},
+
+        {{-0.5f,0.0f,0.0f},{1.0f,0.0f,0.0f}},
+        {{10.5f,0.0f,0.0f},{0.0f,1.0f,0.0f}},
+        {{0.0f,-0.5f,0.0f},{0.0f,0.0f,1.0f}},
+
+        {{10.0f,-0.5f,0.0f},{1.0f,0.0f,0.0f}},
+        {{10.5f,0.5f,0.0f},{0.0f,1.0f,0.0f}},
+        {{-10.5f,0.5f,0.0f},{0.0f,0.0f,1.0f}},
     };
 
     HELLO_TRIANGLE.pVertex_buffer = HELLO_VERTEX;
-    HELLO_TRIANGLE.vertex_count = 12;
+    HELLO_TRIANGLE.vertex_count = sizeof(HELLO_VERTEX)/sizeof(HELLO_VERTEX[0]);
 
-    wlInitVertexBuffer(&HELLO_TRIANGLE, 1);
+    
 
-    engine->main_scene.camera.position.x = 0.4f;
-    engine->main_scene.camera.position.y = 0.2f;
-    engine->main_scene.camera.position.z = 0.1f;
+    engine->main_scene.camera.position.x = 5.4f;
+    engine->main_scene.camera.position.y = -5.2f;
+    engine->main_scene.camera.position.z = 2.01f;
 
-    engine->main_scene.camera.yaw = 10;
-    engine->main_scene.camera.pitch = 200;
-
+    wlInitSVO();
     engine->main_scene.chunk_count = 1;
     engine->main_scene.pChunks = (WLChunk*)wlAlloc(sizeof(WLChunk));
     
-    engine->main_scene.pChunks[1].SVO = wlCreateSVOInstance(vec3f{-8.0f,-8.0f,-8.0f}, WL_SVO_LEVEL_16_METERS, WL_SVO_LEVEL_1_METER);
-    //wlGenerateSVOWithRegion(engine->main_scene.pChunks[1].SVO, , 69420);
+    engine->main_scene.pChunks[1].SVO = wlCreateSVOInstance(vec3f{-8.0f,-8.0f,-8.0f}, WL_SVO_LEVEL_16_METERS, WL_SVO_LEVEL_4_METERS);
+    wlGenerateChunkSVO(&engine->main_scene.pChunks[1]);
+    WLRenderObject chunk_mesh = WLGetChunkSVOMesh(engine->main_scene.pChunks[0]);
+    
+    wlInitVertexBuffer(&chunk_mesh, 1);
 
     return engine;
 }
 void wlDestroyEngine(WLEngine* engine){
-    wlDestroyWindow(engine->pWindow);
+    wlDestroyWindow();
     wlDestroyRenderer();
     wlReleaseAlloc();
 }
 void wlRunEngine(WLEngine* engine){
-    while(!wlWindowShouldClose(engine->pWindow)){
+    while(!wlWindowShouldClose()){
         // polling inputs
-        wlUpdateWindow(engine->pWindow);
+        wlUpdateWindow();
 
-        struct timespec current_time;
-        clock_gettime(CLOCK_MONOTONIC, &current_time);
-        engine->main_scene.camera.yaw = current_time.tv_sec*10;
-        engine->main_scene.camera.pitch = current_time.tv_sec*2;
+        // getting the camera aim direction
+        WL32fVec2 cursor_pos = wlGetCursorPositon();
+        engine->main_scene.camera.yaw = -360*cursor_pos.x;
+        engine->main_scene.camera.pitch = 180*cursor_pos.y;
 
+        wlMoveCamera(&engine->main_scene, 0.01f);
 
         // getting the camera
         glm::mat4 camera_matrix = wlGetCameraMatrix(engine->main_scene);

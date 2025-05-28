@@ -19,14 +19,40 @@ void wlCreateSceneMeshObjects(WLScene scene){
     //TODO: free the WL render objects from the allocator
 }
 
+void wlMoveCamera(WLScene* scene, float dt){
+    vec3f forward_direction_vector; // Z axis in camera space
+    forward_direction_vector.x = cos(glm::radians(scene->camera.pitch)) * sin(glm::radians(scene->camera.yaw));
+    forward_direction_vector.y = cos(glm::radians(scene->camera.pitch)) * cos(glm::radians(scene->camera.yaw));
+    forward_direction_vector.z = 0.0f;//sin(glm::radians(scene->camera.pitch));
+    forward_direction_vector = wlget32fVec3Normalized(forward_direction_vector);
+
+    vec3f right_direction_vector; // X axis in camera space
+    // the X product of the world vertical axis and the forward would give the right vector
+    right_direction_vector = wlget32fVec3Normalized(wlCross32fVec3(forward_direction_vector, vec3f{0.0f, 0.0f, 1.0f}));
+
+    vec3f movement_direction;
+    movement_direction = wlGetMovementDirectionFreeMove();
+
+    vec3f new_offset = {
+        forward_direction_vector*movement_direction.y +
+        right_direction_vector*movement_direction.x +
+        vec3f{0,0,1}*movement_direction.z
+    };
+
+    //printf("movement direction: (%f,%f,%f)\n", movement_direction.x, movement_direction.y, movement_direction.z);
+    //printf("offseting camera position by: (%f,%f,%f)\n", movement_direction.x, movement_direction.y, movement_direction.z);
+
+    scene->camera.position += new_offset*dt;
+    
+}
 glm::mat4x4 wlGetCameraMatrix(WLScene scene){
     // controlling the camera is as simple as translating it and moving the yaw and pitch with mouse
 
     // getting the axis that the camera is looking in the direction of
     vec3f forward_direction_vector; // Z axis in camera space
-    forward_direction_vector.x = cos(glm::radians(scene.camera.pitch)) * cos(glm::radians(scene.camera.yaw));
-    forward_direction_vector.y = sin(glm::radians(scene.camera.pitch));
-    forward_direction_vector.z = cos(glm::radians(scene.camera.pitch)) * sin(glm::radians(scene.camera.yaw));
+    forward_direction_vector.x = cos(glm::radians(scene.camera.pitch)) * sin(glm::radians(scene.camera.yaw));
+    forward_direction_vector.y = cos(glm::radians(scene.camera.pitch)) * cos(glm::radians(scene.camera.yaw));
+    forward_direction_vector.z = sin(glm::radians(scene.camera.pitch));
 
     vec3f right_direction_vector; // X axis in camera space
     // the X product of the world vertical axis and the forward would give the right vector
@@ -36,13 +62,13 @@ glm::mat4x4 wlGetCameraMatrix(WLScene scene){
     up_direction_vector = wlget32fVec3Normalized(wlCross32fVec3(forward_direction_vector, right_direction_vector));
 
     glm::mat4x4 view_matrix = glm::lookAt(
-        glm::vec3 {scene.camera.position.x,scene.camera.position.y,scene.camera.position.z},
-        glm::vec3 {forward_direction_vector.x + scene.camera.position.x,forward_direction_vector.y + scene.camera.position.y,forward_direction_vector.z + scene.camera.position.z},
+        glm::vec3 {scene.camera.position.x,scene.camera.position.y,-scene.camera.position.z},
+        glm::vec3 {forward_direction_vector.x + scene.camera.position.x,forward_direction_vector.y + scene.camera.position.y,forward_direction_vector.z - scene.camera.position.z},
         glm::vec3 {up_direction_vector.x,up_direction_vector.y,up_direction_vector.z}
     );
 
     // TODO: make the aspect ration and FOV dynamic and editable in settings
-    glm::mat4 projection_matrix = glm::perspective(glm::radians(90.0f), (float) 16 / (float)9, 0.1f, 100.0f);
+    glm::mat4 projection_matrix = glm::perspective(glm::radians(45.0f), (float) 16 / (float)9, 0.1f, 100.0f);
     // Flip Y for Vulkan
     projection_matrix[1][1] *= -1;
 
